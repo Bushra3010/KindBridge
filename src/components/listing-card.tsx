@@ -14,7 +14,7 @@ type L = {
 export function ListingCard({ listing, why }: { listing: L; why?: string }) {
   const p = listing.owner.profile;
   return (
-    <Link href={`/listings/${listing.id}`} className="card flex items-center gap-3 p-4 transition hover:shadow-lg">
+    <Link href={`/listings/${listing.id}`} className="listing-card card flex items-center gap-3 p-4 transition hover:shadow-lg">
       <Avatar preset={p?.avatar} size={52} online={!p?.paused} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -36,8 +36,8 @@ export function ListingCard({ listing, why }: { listing: L; why?: string }) {
 
 export function MiniListingCard({ listing }: { listing: L }) {
   return (
-    <Link href={`/listings/${listing.id}`} className="card flex w-40 shrink-0 flex-col gap-3 p-4 transition hover:shadow-lg">
-      <div className="grid size-10 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon name={CATEGORY_ICON[listing.category.slug] ?? "sparkle"} /></div>
+    <Link href={`/listings/${listing.id}`} className="mini-listing card flex w-44 shrink-0 flex-col gap-3 p-4 transition hover:shadow-lg">
+      <div className="skill-icon grid size-11 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon name={CATEGORY_ICON[listing.category.slug] ?? "sparkle"} /></div>
       <div className="line-clamp-2 min-h-[2.5em] text-[15px] font-bold leading-tight">{listing.title}</div>
       <div className="flex items-center gap-1 text-[12px] text-muted"><Coin size={13} />{listing.coins} coins · {listing.durationMin} min</div>
     </Link>

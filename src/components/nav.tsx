@@ -16,8 +16,8 @@ const TABS: { href: string; label: string; icon: IconName | "coin"; match: strin
 export function BottomNav({ unread = 0 }: { unread?: number }) {
   const path = usePathname();
   return (
-    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 pb-[max(env(safe-area-inset-bottom),10px)]">
-      <div className="mx-auto flex max-w-md items-center justify-between gap-1 rounded-full border border-white/70 bg-white/90 p-1.5 shadow-[0_8px_30px_-10px_rgb(29_54_64/.25)] backdrop-blur mx-3 sm:mx-auto">
+    <nav aria-label="Main" className="bottom-nav fixed inset-x-0 bottom-0 z-30 pb-[max(env(safe-area-inset-bottom),14px)]">
+      <div className="nav-tray mx-auto flex max-w-md items-center justify-between gap-1 rounded-full border border-white/70 bg-white/90 p-1.5 backdrop-blur">
         {TABS.map((t) => {
           const active = t.match.some((m) => path.startsWith(m));
           return (
@@ -25,7 +25,7 @@ export function BottomNav({ unread = 0 }: { unread?: number }) {
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex h-12 items-center justify-center gap-1.5 rounded-full transition ${active ? "flex-[1.6] bg-gradient-to-r from-teal-100 to-sky-100 px-3 text-teal-800" : "flex-1 text-ink-soft hover:bg-mist"}`}
+              className={`nav-tab relative flex h-[52px] items-center justify-center gap-1.5 rounded-full transition ${active ? "nav-tab-active flex-[1.6] bg-gradient-to-r from-teal-100 to-sky-100 px-3 text-teal-800" : "flex-1 bg-white/80 text-ink-soft hover:bg-mist"}`}
             >
               {t.icon === "coin" ? <Coin size={22} /> : <Icon name={t.icon} size={22} />}
               <span className={active ? "text-[13px] font-bold" : "sr-only"}>{t.label}</span>

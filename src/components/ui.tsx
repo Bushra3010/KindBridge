@@ -4,7 +4,7 @@ import { EXCHANGE_STATUS_LABEL } from "@/lib/constants";
 
 export function PageHeader({ title, back, right, subtitle }: { title: string; back?: string; right?: React.ReactNode; subtitle?: string }) {
   return (
-    <header className="mb-5 flex items-center gap-3 pt-2">
+    <header className="page-header mb-6 flex items-center gap-3 pt-2">
       {back && (
         <Link href={back} aria-label="Back" className="grid size-10 shrink-0 place-items-center rounded-full bg-white/80 text-ink shadow-sm hover:bg-white">
           <Icon name="left" />
@@ -20,7 +20,7 @@ export function PageHeader({ title, back, right, subtitle }: { title: string; ba
 }
 
 export function Screen({ children, nav = true }: { children: React.ReactNode; nav?: boolean }) {
-  return <main className={`mx-auto w-full max-w-md px-4 pt-[max(env(safe-area-inset-top),16px)] ${nav ? "pb-32" : "pb-10"}`}>{children}</main>;
+  return <main className={`app-screen mx-auto w-full max-w-md px-5 pt-[max(env(safe-area-inset-top),24px)] ${nav ? "member-screen pb-32" : "auth-screen pb-10"}`}>{children}</main>;
 }
 
 export function Row({ href, icon, label, value, danger }: { href: string; icon: IconName; label: string; value?: React.ReactNode; danger?: boolean }) {

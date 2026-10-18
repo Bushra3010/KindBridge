@@ -37,11 +37,11 @@ export default async function Home() {
 
   return (
     <Screen>
-      <header className="flex items-center gap-3 pt-2">
+      <header className="home-header flex items-center gap-3 pt-2">
         <Link href="/profile"><Avatar preset={profile.avatar} size={54} online={!profile.paused} /></Link>
         <div className="flex-1">
           <p className="text-[20px] font-extrabold leading-tight">{profile.displayName}</p>
-          <p className="text-[14px] text-muted">{community.name}</p>
+          <p className="text-[14px] text-ink-soft">@{profile.username}</p>
         </div>
         <Link href="/coins" className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[14px] font-bold shadow-sm">
           <Coin size={20} /> {wallet.available}
@@ -66,7 +66,7 @@ export default async function Home() {
       )}
 
       {recentHelpers.length > 0 && (
-        <div className="-mx-4 mt-5 flex gap-4 overflow-x-auto px-4 pb-1">
+        <div className="helper-strip -mx-4 mt-6 flex gap-5 overflow-x-auto px-5 py-2">
           {recentHelpers.map((l) => (
             <Link key={l.ownerId} href={`/u/${l.owner.profile?.username}`} className="flex w-16 shrink-0 flex-col items-center gap-1">
               <Avatar preset={l.owner.profile?.avatar} size={60} online={!l.owner.profile?.paused} />
@@ -96,19 +96,11 @@ export default async function Home() {
         )}
       </section>
 
-      {opportunities.length > 0 && (
-        <section className="mt-6">
-          <h2 className="h-section mb-3">Requests that match your skills</h2>
-          <div className="space-y-3">
-            {opportunities.slice(0, 3).map(({ listing, why }) => <ListingCard key={listing.id} listing={listing} why={why} />)}
-          </div>
-        </section>
-      )}
 
       <section className="mt-6">
         <h2 className="h-section mb-3">For your community</h2>
-        <div className="card-tint relative overflow-hidden p-5">
-          <div className="mb-3 grid size-10 place-items-center rounded-full bg-white text-teal-700"><Icon name="users" /></div>
+        <div className="community-card card-tint relative overflow-hidden p-5">
+          <div className="mb-3 flex items-center gap-2"><span className="grid size-10 place-items-center rounded-full bg-white/90 text-teal-700"><Icon name="users" /></span><span className="text-[12px] font-semibold text-ink-soft">{community.name}</span></div>
           <p className="text-[20px] font-extrabold">Share what you know</p>
           <p className="text-[14px] text-ink-soft">Someone nearby could use your skills.</p>
           <div className="mt-4 flex items-center justify-between">
@@ -117,6 +109,14 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      {opportunities.length > 0 && (
+        <section className="mt-6">
+          <h2 className="h-section mb-3">Requests that match your skills</h2>
+          <div className="space-y-3">
+            {opportunities.slice(0, 3).map(({ listing, why }) => <ListingCard key={listing.id} listing={listing} why={why} />)}
+          </div>
+        </section>
+      )}
     </Screen>
   );
 }

@@ -4,11 +4,11 @@ import { Icon } from "./icons";
 
 export function CoinHero({ available, reserved, actions = true }: { available: number; reserved: number; actions?: boolean }) {
   return (
-    <div className="card-tint p-5">
+    <div className="coin-hero card-tint p-5">
       <div className="flex items-center gap-4">
-        <Coin size={96} className="drop-shadow-[0_8px_14px_rgba(176,122,16,.3)]" />
+        <Coin size={112} className="drop-shadow-[0_8px_14px_rgba(176,122,16,.3)]" />
         <div>
-          <p className="text-[48px] font-extrabold leading-none">{available}</p>
+          <p className="text-[58px] font-semibold leading-none">{available}</p>
           <p className="text-[17px] font-semibold">Available help coins</p>
           {reserved > 0 && (
             <p className="mt-1 flex items-center gap-1 text-[14px] text-ink-soft">
