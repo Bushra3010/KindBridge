@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* KindBridge tokens, sampled from the App Design boards. */
+@theme {
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #1d3640;
+  --color-ink-soft: #4a626b;
+  --color-muted: #71858c;
+  --color-line: #e3ecef;
+  --color-surface: #ffffff;
+  --color-mist: #f3f8fa;
+
+  --color-teal-50: #eaf5f4;
+  --color-teal-100: #d6ecea;
+  --color-teal-200: #b6dcd8;
+  --color-teal-600: #4a7d84;
+  --color-teal-700: #3e6a72;
+  --color-teal-800: #335860;
+
+  --color-sky-50: #edf4fa;
+  --color-sky-100: #dbe8f3;
+
+  --color-gold-300: #f5cf5d;
+  --color-gold-500: #e2a521;
+  --color-gold-700: #b07a10;
+
+  --color-plus: #23a55f;
+  --color-minus: #e0464f;
+
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(29 54 64 / 0.04), 0 6px 24px -8px rgb(29 54 64 / 0.10);
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+
+body {
+  color: var(--color-ink);
+  background: linear-gradient(160deg, #e6f0f6 0%, #eef5f6 45%, #e5f2ee 100%) fixed;
+  min-height: 100dvh;
+}
+
+@layer components {
+  .card { @apply rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]; }
+  .card-tint { @apply rounded-[var(--radius-card)] bg-gradient-to-br from-sky-100 via-teal-50 to-teal-100; }
+
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-bold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700; }
+  .btn-primary { @apply btn bg-teal-700 text-white shadow-md shadow-teal-800/20 hover:bg-teal-800; }
+  .btn-secondary { @apply btn bg-surface text-ink border border-line hover:bg-mist; }
+  .btn-ghost { @apply btn bg-transparent text-teal-700 hover:bg-teal-50; }
+  .btn-danger { @apply btn bg-surface text-minus border border-red-200 hover:bg-red-50; }
+  .btn-sm { @apply px-3.5 py-2 text-[13px]; }
+
+  .field { @apply block w-full rounded-2xl border border-line bg-surface px-4 py-3 text-[15px] text-ink placeholder:text-muted/80 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100; }
+  .label { @apply mb-1.5 block text-[13px] font-bold text-ink-soft; }
+
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold text-ink-soft transition hover:border-teal-200; }
+  .chip-on { @apply border-teal-200 bg-teal-100 text-teal-800; }
+
+  .pill { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold; }
+
+  .h-title { @apply text-[22px] font-extrabold tracking-tight text-ink; }
+  .h-section { @apply text-[17px] font-extrabold text-ink; }
+}
+
+/* Hidden checkbox/radio styled via sibling label (chips, toggles). */
+.peer-chip:checked + label { background: var(--color-teal-100); border-color: var(--color-teal-200); color: var(--color-teal-800); }
+.peer-chip:focus-visible + label { outline: 2px solid var(--color-teal-700); outline-offset: 2px; }
+
+.toggle { appearance: none; width: 46px; height: 28px; border-radius: 999px; background: #dbe3e6; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 999px; background: white; box-shadow: 0 1px 3px rgb(0 0 0 / .2); transition: transform .2s; }
+.toggle:checked { background: var(--color-teal-800); }
+.toggle:checked::after { transform: translateX(18px); }
+.toggle:focus-visible { outline: 2px solid var(--color-teal-700); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

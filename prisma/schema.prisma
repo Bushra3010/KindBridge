@@ -1,0 +1,396 @@
+// KindBridge P0 data model (PRD §13).
+// SQLite for local development; string columns stand in for enums so the
+// schema ports to Postgres without changes. Allowed values are documented
+// inline and enforced in src/lib/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Accounts & identity ────────────────────────────────────────────────
+
+model Account {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  emailVerifiedAt  DateTime?
+  verifyCode       String?
+  adultConfirmedAt DateTime?
+  rulesAcceptedAt  DateTime?
+  role             String    @default("MEMBER") // MEMBER | MODERATOR | COIN_ADMIN | ADMIN
+  status           String    @default("ACTIVE") // ACTIVE | SUSPENDED | CLOSED
+  timezone         String    @default("Asia/Kolkata")
+  createdAt        DateTime  @default(now())
+
+  profile        Profile?
+  contact        PrivateContact?
+  sessions       Session[]
+  memberships    Membership[]
+  skills         UserSkill[]
+  listings       Listing[]
+  notifications  Notification[]
+  coinAccounts   HelpCoinAccount[]
+  grantsGiven    DisclosureGrant[] @relation("GrantOwner")
+  grantsReceived DisclosureGrant[] @relation("GrantRecipient")
+  reviewsWritten Review[]          @relation("ReviewAuthor")
+  reviewsAbout   Review[]          @relation("ReviewSubject")
+  reports        Report[]          @relation("Reporter")
+  blocks         Block[]           @relation("Blocker")
+  blockedBy      Block[]           @relation("Blocked")
+  asRequester    Exchange[]        @relation("Requester")
+  asHelper       Exchange[]        @relation("Helper")
+  messages       Message[]
+}
+
+model Session {
+  id        String   @id // random token (hashed)
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+/// Private fields. Never returned to other members except through an active DisclosureGrant.
+model PrivateContact {
+  accountId       String  @id
+  firstName       String?
+  phone           String?
+  photoUrl        String?
+  meetingLocation String?
+  account         Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model Profile {
+  accountId     String   @id
+  username      String   @unique // stored lowercase for uniqueness
+  displayName   String // username as typed (case preserved)
+  avatar        String   @default("a1")
+  bio           String   @default("")
+  availability  String   @default("Weekends")
+  paused        Boolean  @default(false)
+  onboardedAt   DateTime?
+  notifyDigest  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+// ── Communities ────────────────────────────────────────────────────────
+
+model Community {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  description        String
+  inviteCode         String   @unique
+  joinPolicy         String   @default("APPROVAL") // APPROVAL | INVITE
+  starterGrant       Int      @default(20)
+  starterAllocation  Int      @default(2000) // cap on total starter coins issued
+  createdAt          DateTime @default(now())
+
+  memberships  Membership[]
+  listings     Listing[]
+  coinAccounts HelpCoinAccount[]
+  exchanges    Exchange[]
+}
+
+model Membership {
+  id             String    @id @default(cuid())
+  accountId      String
+  communityId    String
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED | REMOVED
+  role           String    @default("MEMBER") // MEMBER | ORGANIZER
+  viaInvite      Boolean   @default(false)
+  approvedAt     DateTime?
+  approvedById   String?
+  starterGranted Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  account        Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  community      Community @relation(fields: [communityId], references: [id])
+
+  @@unique([accountId, communityId])
+  @@index([communityId, status])
+}
+
+// ── Skills & listings ──────────────────────────────────────────────────
+
+model SkillCategory {
+  id       String      @id @default(cuid())
+  slug     String      @unique
+  name     String
+  icon     String
+  maxCoins Int         @default(60) // pilot per-category quote ceiling
+  active   Boolean     @default(true)
+  skills   UserSkill[]
+  listings Listing[]
+}
+
+model UserSkill {
+  accountId  String
+  categoryId String
+  kind       String // OFFER | NEED
+  account    Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category   SkillCategory @relation(fields: [categoryId], references: [id])
+
+  @@id([accountId, categoryId, kind])
+}
+
+model Listing {
+  id           String        @id @default(cuid())
+  communityId  String
+  ownerId      String
+  kind         String // OFFER | REQUEST
+  categoryId   String
+  title        String
+  description  String
+  durationMin  Int
+  coins        Int
+  format       String // ONLINE | SHARED_SPACE
+  availability String
+  status       String        @default("OPEN") // OPEN | PAUSED | CLOSED | REMOVED
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  community    Community     @relation(fields: [communityId], references: [id])
+  owner        Account       @relation(fields: [ownerId], references: [id])
+  category     SkillCategory @relation(fields: [categoryId], references: [id])
+  exchanges    Exchange[]
+
+  @@index([communityId, status, kind])
+}
+
+// ── Exchanges ──────────────────────────────────────────────────────────
+
+/// One proposal thread between a requester (pays coins) and a helper (earns coins).
+/// Lifecycle: PROPOSED → ACCEPTED → IN_PROGRESS → DELIVERED → COMPLETED,
+/// plus DECLINED | WITHDRAWN | EXPIRED | CANCELLED | DISPUTED | RESOLVED.
+model Exchange {
+  id                String    @id @default(cuid())
+  ref               String    @unique // human reference, e.g. KB-1042
+  communityId       String
+  listingId         String
+  requesterId       String
+  helperId          String
+  status            String    @default("PROPOSED")
+  acceptedVersionId String?
+  reserved          Int       @default(0) // coins currently held for this exchange
+  settled           Int       @default(0) // coins transferred to helper
+  refunded          Int       @default(0) // coins returned to requester
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  deliveredAt       DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  // Partial-delivery agreement (both parties must approve the same amount).
+  partialAmount     Int?
+  partialByReq      Boolean   @default(false)
+  partialByHelper   Boolean   @default(false)
+  remindersSent     Int       @default(0)
+  flaggedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  community Community         @relation(fields: [communityId], references: [id])
+  listing   Listing           @relation(fields: [listingId], references: [id])
+  requester Account           @relation("Requester", fields: [requesterId], references: [id])
+  helper    Account           @relation("Helper", fields: [helperId], references: [id])
+  versions  ProposalVersion[]
+  messages  Message[]
+  reviews   Review[]
+  grants    DisclosureGrant[]
+  events    ExchangeEvent[]
+
+  @@index([requesterId, status])
+  @@index([helperId, status])
+  @@index([listingId, status])
+}
+
+model ProposalVersion {
+  id           String    @id @default(cuid())
+  exchangeId   String
+  version      Int
+  authorId     String
+  deliverable  String
+  durationMin  Int
+  coins        Int
+  format       String
+  scheduledAt  DateTime
+  materials    String    @default("")
+  note         String    @default("")
+  createdAt    DateTime  @default(now())
+  exchange     Exchange  @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@unique([exchangeId, version])
+}
+
+model ExchangeEvent {
+  id         String   @id @default(cuid())
+  exchangeId String
+  actorId    String?
+  type       String
+  detail     String   @default("")
+  createdAt  DateTime @default(now())
+  exchange   Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@index([exchangeId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  exchangeId String
+  senderId   String?
+  kind       String   @default("TEXT") // TEXT | SYSTEM
+  body       String
+  createdAt  DateTime @default(now())
+  exchange   Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  sender     Account? @relation(fields: [senderId], references: [id])
+
+  @@index([exchangeId, createdAt])
+}
+
+// ── Help-coin ledger (PRD §7) ──────────────────────────────────────────
+
+/// Cached balances; the source of truth is the sum of LedgerEntry rows.
+/// kind MEMBER accounts can never go negative. One ISSUANCE account per community.
+model HelpCoinAccount {
+  id          String        @id @default(cuid())
+  communityId String
+  accountId   String?
+  kind        String        @default("MEMBER") // MEMBER | ISSUANCE
+  available   Int           @default(0)
+  reserved    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  community   Community     @relation(fields: [communityId], references: [id])
+  account     Account?      @relation(fields: [accountId], references: [id])
+  entries     LedgerEntry[]
+
+  @@unique([communityId, accountId])
+}
+
+model LedgerTransaction {
+  id             String        @id @default(cuid())
+  idempotencyKey String        @unique
+  type           String // STARTER_GRANT | RESERVE | RELEASE | SETTLE | REFUND | CORRECTION
+  actorId        String?
+  exchangeId     String?
+  reason         String
+  reversesId     String?
+  createdAt      DateTime      @default(now())
+  entries        LedgerEntry[]
+
+  @@index([exchangeId])
+}
+
+/// Signed amounts; the entries of a transaction always sum to zero.
+model LedgerEntry {
+  id            String            @id @default(cuid())
+  transactionId String
+  coinAccountId String
+  bucket        String // AVAILABLE | RESERVED
+  amount        Int
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id])
+  coinAccount   HelpCoinAccount   @relation(fields: [coinAccountId], references: [id])
+
+  @@index([coinAccountId])
+}
+
+// ── Privacy ────────────────────────────────────────────────────────────
+
+model DisclosureGrant {
+  id          String    @id @default(cuid())
+  ownerId     String
+  recipientId String
+  exchangeId  String
+  field       String // FIRST_NAME | PHOTO | PHONE | MEETING_LOCATION
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  owner       Account   @relation("GrantOwner", fields: [ownerId], references: [id])
+  recipient   Account   @relation("GrantRecipient", fields: [recipientId], references: [id])
+  exchange    Exchange  @relation(fields: [exchangeId], references: [id])
+
+  @@index([recipientId, revokedAt])
+  @@index([ownerId])
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   Account  @relation("Blocker", fields: [blockerId], references: [id])
+  blocked   Account  @relation("Blocked", fields: [blockedId], references: [id])
+
+  @@id([blockerId, blockedId])
+}
+
+// ── Reputation ─────────────────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(cuid())
+  exchangeId String
+  authorId   String
+  subjectId  String
+  rating     Int
+  body       String   @default("")
+  thanks     String   @default("") // private thank-you note, only the subject sees it
+  createdAt  DateTime @default(now())
+  exchange   Exchange @relation(fields: [exchangeId], references: [id])
+  author     Account  @relation("ReviewAuthor", fields: [authorId], references: [id])
+  subject    Account  @relation("ReviewSubject", fields: [subjectId], references: [id])
+
+  @@unique([exchangeId, authorId])
+  @@index([subjectId])
+}
+
+// ── Safety & moderation ────────────────────────────────────────────────
+
+/// A report doubles as the moderation case (PRD §10).
+model Report {
+  id          String    @id @default(cuid())
+  ref         String    @unique
+  reporterId  String
+  targetType  String // LISTING | PROFILE | MESSAGE | REVIEW | EXCHANGE
+  targetId    String
+  category    String
+  explanation String    @default("")
+  status      String    @default("OPEN") // OPEN | IN_REVIEW | RESOLVED | DISMISSED
+  assigneeId  String?
+  resolution  String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  reporter    Account   @relation("Reporter", fields: [reporterId], references: [id])
+
+  @@index([status])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  accountId String
+  type      String
+  category  String    @default("REQUESTS") // REQUESTS | COINS | COMMUNITY | SAFETY
+  title     String
+  body      String    @default("")
+  href      String    @default("/")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String
+  data       String   @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+}
