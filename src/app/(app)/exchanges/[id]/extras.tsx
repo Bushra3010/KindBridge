@@ -18,13 +18,12 @@ type Ex = { id: string; ref: string; status: string; requesterId: string; helper
  */
 export async function ExchangeExtras({ ex, viewerId, otherId, otherName }: { ex: Ex; viewerId: string; otherId: string; otherName: string }) {
   const canShare = ["ACCEPTED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "DISPUTED", "RESOLVED"].includes(ex.status);
-  const [sharedWithMe, myGrants, myContact, blocked, myReview, reviewCount] = await Promise.all([
+  const [sharedWithMe, myGrants, myContact, blocked, myReview] = await Promise.all([
     visibleContact(viewerId, otherId),
     db.disclosureGrant.findMany({ where: { ownerId: viewerId, recipientId: otherId, revokedAt: null } }),
     db.privateContact.findUnique({ where: { accountId: viewerId } }),
     isBlockedEitherWay(db, viewerId, otherId),
     db.review.findFirst({ where: { exchangeId: ex.id, authorId: viewerId } }),
-    db.review.count({ where: { exchangeId: ex.id } }),
   ]);
 
   return (
@@ -59,13 +58,13 @@ export async function ExchangeExtras({ ex, viewerId, otherId, otherName }: { ex:
             </fieldset>
             <textarea name="body" rows={2} className="field" placeholder="A short, honest review (public)" maxLength={500} aria-label="Review" />
             <textarea name="thanks" rows={2} className="field" placeholder={`A private thank-you note for ${otherName} (optional)`} maxLength={500} aria-label="Private thank-you note" />
-            <Note>Don&apos;t include names, addresses or contact details. Reviews publish after you both submit, or after 7 days.</Note>
+            <Note>Don&apos;t include names, addresses or contact details.</Note>
             <Submit>Submit review</Submit>
           </ActionForm>
         </div>
       )}
       {ex.status === "COMPLETED" && myReview && (
-        <p className="card p-4 text-center text-[14px] text-ink-soft">Thanks for your review. {reviewCount < 2 ? "It will publish once both reviews are in or after 7 days." : "Both reviews are published."}</p>
+        <p className="card p-4 text-center text-[14px] text-ink-soft">Thanks for your review. It&apos;s now on their profile.</p>
       )}
 
       {canShare && Object.keys(sharedWithMe).length > 0 && (

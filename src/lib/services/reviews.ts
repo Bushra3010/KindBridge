@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { db, transaction } from "@/lib/db";
 import { AppError, forbidden, notFound } from "@/lib/errors";
-import { REVIEW_PUBLISH_DAYS } from "@/lib/constants";
 import { maskContacts, notify } from "./support";
 
 export const reviewSchema = z.object({
@@ -26,15 +25,13 @@ export async function submitReview(authorId: string, exchangeId: string, input: 
   });
 }
 
-/** A review is public once both parties have reviewed, or 7 days after settlement. */
+/** Reviews are public as soon as they're submitted. */
 export async function publishedReviewsFor(subjectId: string) {
-  const cutoff = new Date(Date.now() - REVIEW_PUBLISH_DAYS * 86_400_000);
-  const reviews = await db.review.findMany({
+  return db.review.findMany({
     where: { subjectId },
-    include: { exchange: { include: { reviews: { select: { id: true } } } }, author: { include: { profile: true } } },
+    include: { author: { include: { profile: true } } },
     orderBy: { createdAt: "desc" },
   });
-  return reviews.filter((r) => r.exchange.reviews.length >= 2 || (r.exchange.completedAt && r.exchange.completedAt < cutoff));
 }
 
 export async function reputation(subjectId: string) {

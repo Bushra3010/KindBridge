@@ -1,6 +1,5 @@
 export const COIN_REFERENCE = { coins: 10, minutes: 30 }; // PRD §7 reference rate
 export const PROPOSAL_EXPIRY_DAYS = 7;
-export const REVIEW_PUBLISH_DAYS = 7;
 export const CONFIRM_REMINDER_HOURS = [24, 72];
 export const CONFIRM_FLAG_DAYS = 7;
 

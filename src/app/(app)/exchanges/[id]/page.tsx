@@ -260,7 +260,7 @@ export default async function ExchangePage({ params, searchParams }: { params: P
         {ex.status === "COMPLETED" && !myReview && (
           <Link href={`/u/${other.profile?.username}?exchange=${ex.id}#review`} className="card flex items-center gap-3 p-4"><Icon name="award" className="text-teal-700" /><span className="flex-1 font-bold">How did it go? Review {otherName}</span><Icon name="right" className="text-muted" /></Link>
         )}
-        {ex.status === "COMPLETED" && myReview && <p className="card p-4 text-center text-[14px] text-ink-soft">Thanks for your review. {ex.reviews.length < 2 ? "It will publish once both reviews are in or after 7 days." : "Both reviews are published."}</p>}
+        {ex.status === "COMPLETED" && myReview && <p className="card p-4 text-center text-[14px] text-ink-soft">Thanks for your review. It&apos;s now on their profile.</p>}
         {ex.status === "COMPLETED" && iAmRequester === false && (
           <Link href="/home" className="card-tint flex items-center gap-3 p-4"><Coin size={30} /><span className="flex-1 text-[14px] font-bold">You earned {ex.settled} coins. See help you can spend them on.</span><Icon name="right" /></Link>
         )}

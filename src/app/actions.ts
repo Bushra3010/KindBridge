@@ -295,7 +295,7 @@ export async function exchangeAction(_: ActionState, fd: FormData): Promise<Acti
     }
   });
   revalidatePath(`/exchanges/${id}`);
-  if (op === "review") revalidatePath("/u/[username]", "page");
+  if (op === "review") { revalidatePath("/u/[username]", "page"); revalidatePath("/profile"); }
   if (res?.error) return res;
   if (op === "accept") redirect(`/exchanges/${id}?booked=1`);
   return res;
