@@ -7,7 +7,7 @@ import * as disclosure from "@/lib/services/disclosure";
 import * as safety from "@/lib/services/safety";
 import * as admin from "@/lib/services/admin";
 import { submitReview, reputation } from "@/lib/services/reviews";
-import { searchListings } from "@/lib/services/listings";
+import { createListing, searchListings } from "@/lib/services/listings";
 import { balance, community, member, offerListing, requestListing, terms } from "./helpers";
 
 async function bookedExchange(coins = 20) {
@@ -264,22 +264,28 @@ describe("§10 platform admin", () => {
     expect(JSON.parse(ev.data)).toMatchObject({ from: "MEMBER", to: "MODERATOR", reason: "Pilot moderator" });
   });
 
-  it("categories and communities are validated, unique and audited", async () => {
+  it("communities are validated, unique and audited", async () => {
     const c = await community();
     const boss = await member(c.id, { role: "ADMIN", grant: false });
-    const slug = `cooking-${Date.now()}`;
-    const cat = await admin.saveCategory(boss.id, null, { name: "Cooking", slug, icon: "heart", maxCoins: 30, active: true });
-    await expect(admin.saveCategory(boss.id, null, { name: "Cooking 2", slug, icon: "heart", maxCoins: 30, active: true })).rejects.toThrow(/already used/);
-    await expect(admin.saveCategory(boss.id, cat.id, { name: "Cooking", slug, icon: "heart", maxCoins: 0, active: true })).rejects.toThrow(/ceiling/);
-    await admin.saveCategory(boss.id, cat.id, { name: "Cooking", slug, icon: "heart", maxCoins: 50, active: false });
-    expect(await db.skillCategory.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ maxCoins: 50, active: false });
 
     const input = { name: "Riverside", slug: `riverside-${Date.now()}`, description: "", inviteCode: `RIVER${Date.now() % 100000}`, joinPolicy: "INVITE" as const, starterGrant: 15, starterAllocation: 500 };
     const made = await admin.saveCommunity(boss.id, null, input);
     await expect(admin.saveCommunity(boss.id, null, { ...input, slug: `other-${Date.now()}` })).rejects.toThrow(/invite code is already used/);
     const member1 = await member(c.id, { grant: false });
     await expect(admin.saveCommunity(member1.id, made.id, { ...input, starterGrant: 99 })).rejects.toThrow(/access/);
-    expect(await db.auditEvent.count({ where: { actorId: boss.id, action: { in: ["category_created", "category_updated", "community_created"] } } })).toBe(3);
+    expect(await db.auditEvent.count({ where: { actorId: boss.id, action: "community_created" } })).toBe(1);
+  });
+});
+
+describe("§6.2 posting without a category", () => {
+  it("files listings under the hidden General category with its coin ceiling", async () => {
+    const c = await community();
+    const a = await member(c.id);
+    const base = { kind: "REQUEST", title: "Marketing help", description: "Ideas for a small bake sale poster", durationMin: 30, format: "ONLINE", availability: "Weekends" };
+    const l = await createListing(a.id, { ...base, coins: 10 });
+    const general = await db.skillCategory.findUniqueOrThrow({ where: { id: l.categoryId } });
+    expect(general).toMatchObject({ slug: "general", active: false });
+    await expect(createListing(a.id, { ...base, coins: general.maxCoins + 1 })).rejects.toThrow(/capped/);
   });
 });
 

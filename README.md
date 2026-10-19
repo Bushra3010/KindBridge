@@ -14,7 +14,7 @@ npm run db:seed           # creates the admin from ADMIN_EMAIL / ADMIN_PASSWORD
 npm run dev               # http://localhost:3000
 ```
 
-Then sign in as the admin and open `/admin`: add the skill categories members choose from (Categories). The community everyone joins is created automatically on the first signup; rename it under Communities.
+Then sign in as the admin at `/admin`. The community everyone joins is created automatically on the first signup (rename it under Communities). Members type their own skills, and listings are filed under a built-in "General" category that caps each listing at 60 coins.
 
 For throwaway demo data instead (members, listings and history; password `kindbridge123`), run `npm run db:seed:demo` on an empty database. Never use it on a database with real members.
 
@@ -46,7 +46,7 @@ src/lib/services/
   disclosure.ts             Field- and recipient-specific sharing grants
   listings.ts               Listings, community-scoped search and ranking, suggestions
   reviews.ts, safety.ts     Reviews/reputation; blocks, reports, moderation
-  admin.ts                  Role changes, communities, categories (ADMIN-only, audited)
+  admin.ts                  Role changes, communities, block/delete (ADMIN-only, audited)
 src/app/actions.ts          Server actions (all mutations)
 src/app/(app)/…             Member screens (home, explore, requests, coins, profile…)
 src/app/mod, /organizer     Moderator and organizer consoles
@@ -62,7 +62,7 @@ tests/acceptance.test.ts    PRD §17 checks
 
 ## P0 status against the PRD
 
-Implemented: onboarding (account, email code, 18+/rules, username and avatar, community join or approval, skills); listings, search and filters; proposals with versioned terms; atomic reservation; chat with polling; reschedule; deliver/confirm/settle; cancel-and-refund; partial settlement; disputes; moderator resolution with audit; no-response reminders and 7-day flag (no auto-settle); reviews with delayed publishing and private thank-you notes; selective disclosure with preview and revoke; blocking; reports and support cases; notifications; organizer approvals with small-count suppression; coin wallet and transaction details; account closure with pseudonymization; admin console (`/admin`: overview, member search with role changes and suspend/restore, communities, skill categories and coin ceilings, per-community reconciliation with audited coin reversals, audit log).
+Implemented: onboarding (account, email code, 18+/rules, username and avatar, community join or approval, skills); listings, search and filters; proposals with versioned terms; atomic reservation; chat with polling; reschedule; deliver/confirm/settle; cancel-and-refund; partial settlement; disputes; moderator resolution with audit; no-response reminders and 7-day flag (no auto-settle); reviews with delayed publishing and private thank-you notes; selective disclosure with preview and revoke; blocking; reports and support cases; notifications; organizer approvals with small-count suppression; coin wallet and transaction details; account closure with pseudonymization; admin console (`/admin`: overview, member search with role changes, block/unblock and delete, communities, per-community reconciliation with audited coin reversals, audit log).
 
 Not done yet:
 - Real email delivery and a scheduler. Sweeps run lazily on page loads for now.

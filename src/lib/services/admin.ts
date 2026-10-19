@@ -48,23 +48,6 @@ export async function saveCommunity(adminId: string, id: string | null, c: Commu
   });
 }
 
-export type CategoryInput = { name: string; slug: string; icon: string; maxCoins: number; active: boolean };
-
-export async function saveCategory(adminId: string, id: string | null, c: CategoryInput) {
-  if (!c.name) throw new AppError("Give the category a name.");
-  if (!/^[a-z0-9-]{2,40}$/.test(c.slug)) throw new AppError("Slug: 2–40 lowercase letters, numbers or dashes.");
-  if (!/^[a-zA-Z]{2,30}$/.test(c.icon)) throw new AppError("Pick an icon from the list.");
-  if (!Number.isInteger(c.maxCoins) || c.maxCoins < 1 || c.maxCoins > 500) throw new AppError("Coin ceiling must be 1–500.");
-  return transaction(async (tx) => {
-    await requireAdmin(tx, adminId);
-    const clash = await tx.skillCategory.findFirst({ where: { slug: c.slug, ...(id && { id: { not: id } }) } });
-    if (clash) throw new AppError("That slug is already used.");
-    const saved = id ? await tx.skillCategory.update({ where: { id }, data: c }) : await tx.skillCategory.create({ data: c });
-    await audit(tx, { actorId: adminId, action: id ? "category_updated" : "category_created", targetType: "SkillCategory", targetId: saved.id, data: c });
-    return saved;
-  });
-}
-
 // ── Blocking and deleting accounts ──────────────────────────────────────
 
 const OPEN_EXCHANGE = ["PROPOSED", "ACCEPTED", "IN_PROGRESS", "DELIVERED", "DISPUTED"];

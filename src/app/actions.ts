@@ -416,24 +416,6 @@ export async function adminSaveCommunity(_: ActionState, fd: FormData): Promise<
   return res;
 }
 
-export async function adminSaveCategory(_: ActionState, fd: FormData): Promise<ActionState> {
-  const account = await me();
-  const id = str(fd, "id") || null;
-  const res = await attempt(
-    () =>
-      admin.saveCategory(account.id, id, {
-        name: str(fd, "name"),
-        slug: str(fd, "slug").toLowerCase(),
-        icon: str(fd, "icon") || "sparkle",
-        maxCoins: Number(fd.get("maxCoins")),
-        active: fd.get("active") === "on",
-      }),
-    id ? "Category saved." : "Category added.",
-  );
-  revalidatePath("/admin", "layout");
-  return res;
-}
-
 export async function decideMember(fd: FormData) {
   const account = await me();
   await decideMembership(account.id, str(fd, "membershipId"), str(fd, "decision") === "approve");

@@ -1,4 +1,3 @@
-import { db } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
 import { postListing } from "@/app/actions";
 import { AVAILABILITY_OPTIONS, DURATIONS } from "@/lib/constants";
@@ -11,11 +10,10 @@ import { Note, PageHeader, Screen } from "@/components/ui";
 
 export const metadata = { title: "New listing" };
 
-export default async function NewListing({ searchParams }: { searchParams: Promise<{ kind?: string; category?: string }> }) {
+export default async function NewListing({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
   const { profile } = await requireMember();
   const sp = await searchParams;
   const kind = sp.kind === "OFFER" ? "OFFER" : "REQUEST";
-  const categories = await db.skillCategory.findMany({ where: { active: true }, orderBy: { name: "asc" } });
   const isOffer = kind === "OFFER";
 
   return (
@@ -35,16 +33,9 @@ export default async function NewListing({ searchParams }: { searchParams: Promi
           <input id="title" name="title" className="field" placeholder={isOffer ? "Spreadsheet basics" : "Help with my presentation"} required minLength={4} maxLength={80} />
         </div>
         <div>
-          <label className="label" htmlFor="categoryId">Category</label>
-          <select id="categoryId" name="categoryId" className="field" required defaultValue={categories.find((c) => c.slug === sp.category)?.id}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <p className="mt-1 text-[12px] text-muted">Only approved everyday categories. No medical, legal, financial, childcare or home-visit services.</p>
-        </div>
-        <div>
           <label className="label" htmlFor="description">Description</label>
           <textarea id="description" name="description" rows={3} className="field" placeholder={isOffer ? "What you can help with and your experience level." : "I'd love feedback on a 5-minute talk."} required minLength={10} maxLength={800} />
-          <p className="mt-1 text-[12px] text-muted">Don't include your address, phone number or real name.</p>
+          <p className="mt-1 text-[12px] text-muted">Don't include your address, phone number or real name. Everyday help only: no medical, legal, financial, childcare or home-visit services.</p>
         </div>
         <FormatToggle />
         <div className="grid grid-cols-2 gap-3">
@@ -58,7 +49,7 @@ export default async function NewListing({ searchParams }: { searchParams: Promi
             <label className="label" htmlFor="coins">Help coins</label>
             <div className="relative">
               <Coin size={20} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input id="coins" name="coins" type="number" min={1} max={500} defaultValue={10} className="field pl-11" required />
+              <input id="coins" name="coins" type="number" min={1} max={60} defaultValue={10} className="field pl-11" required />
             </div>
           </div>
         </div>

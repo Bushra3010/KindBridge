@@ -12,7 +12,6 @@ const SECTIONS: { href: string; label: string; icon: IconName; adminOnly?: boole
   { href: "/admin", label: "Overview", icon: "home" },
   { href: "/admin/members", label: "Members", icon: "users", adminOnly: true },
   { href: "/admin/communities", label: "Communities", icon: "compass", adminOnly: true },
-  { href: "/admin/categories", label: "Skill categories", icon: "tag", adminOnly: true },
   { href: "/admin/coins", label: "Coin ledger", icon: "award" },
   { href: "/admin/audit", label: "Audit log", icon: "history" },
   { href: "/mod", label: "Moderation", icon: "shieldCheck" },

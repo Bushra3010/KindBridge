@@ -5,7 +5,7 @@ import { AppError, forbidden, notFound } from "@/lib/errors";
 
 export const listingSchema = z.object({
   kind: z.enum(["OFFER", "REQUEST"]),
-  categoryId: z.string().min(1, "Choose a category"),
+  categoryId: z.string().optional(), // members don't pick one; see generalCategory()
   title: z.string().trim().min(4, "Add a short title").max(80),
   description: z.string().trim().min(10, "Add a little more detail").max(800),
   durationMin: z.coerce.number().int().min(15).max(240),
@@ -14,15 +14,28 @@ export const listingSchema = z.object({
   availability: z.string().trim().min(1).max(80),
 });
 
+/**
+ * Members don't choose a category when posting; listings are filed under this
+ * built-in one, which also sets the per-listing coin ceiling. It's inactive so
+ * it never appears as a skill chip or explore filter.
+ */
+async function generalCategory(tx: Prisma.TransactionClient) {
+  return tx.skillCategory.upsert({
+    where: { slug: "general" },
+    create: { slug: "general", name: "General", icon: "sparkle", maxCoins: 60, active: false },
+    update: {},
+  });
+}
+
 export async function createListing(ownerId: string, input: unknown) {
   const data = listingSchema.parse(input);
   return transaction(async (tx) => {
     const m = await tx.membership.findFirst({ where: { accountId: ownerId, status: "APPROVED" } });
     if (!m) throw new AppError("You can post once your community membership is approved.");
-    const category = await tx.skillCategory.findUnique({ where: { id: data.categoryId } });
-    if (!category?.active) throw new AppError("Choose one of the approved service categories.");
-    if (data.coins > category.maxCoins) throw new AppError(`${category.name} listings are capped at ${category.maxCoins} coins in the pilot.`);
-    return tx.listing.create({ data: { ...data, ownerId, communityId: m.communityId } });
+    const category = data.categoryId ? await tx.skillCategory.findUnique({ where: { id: data.categoryId } }) : await generalCategory(tx);
+    if (!category || (data.categoryId && !category.active)) throw new AppError("Choose one of the approved service categories.");
+    if (data.coins > category.maxCoins) throw new AppError(`Listings are capped at ${category.maxCoins} coins in the pilot.`);
+    return tx.listing.create({ data: { ...data, categoryId: category.id, ownerId, communityId: m.communityId } });
   });
 }
 
