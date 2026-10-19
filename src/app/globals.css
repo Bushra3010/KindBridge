@@ -246,3 +246,105 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
   .welcome-art { zoom: .42; }
   .welcome-title { font-size: 23px; }
 }
+
+/* ── Dark theme ─────────────────────────────────────────────────────────
+   Set on <html data-theme="dark"> by the inline script in app/layout.tsx.
+   Tokens and the Tailwind palette are remapped so utility classes follow;
+   the hand-tuned light surfaces above get explicit dark counterparts. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ink: #e4edf1;
+  --color-ink-soft: #b2c3cf;
+  --color-muted: #8798a8;
+  --color-line: #263844;
+  --color-surface: #152028;
+  --color-mist: #1b2933;
+
+  --color-teal-50: #14302e;
+  --color-teal-100: #1b3f3c;
+  --color-teal-200: #2b5c58;
+  --color-teal-600: #6fb4bd;
+  --color-teal-700: #86c6cf;
+  --color-teal-800: #a6dadf;
+  --color-sky-50: #152735;
+  --color-sky-100: #1d3a4e;
+  --color-sky-900: #bfe0f5;
+  --color-gold-700: #f0c25a;
+
+  --color-amber-50: #2e2614;
+  --color-amber-100: #3a3016;
+  --color-amber-300: #7a6223;
+  --color-amber-600: #f0b545;
+  --color-amber-900: #f6dc9c;
+  --color-orange-100: #3a2516;
+  --color-orange-900: #f8c9a4;
+  --color-red-50: #3a1a1d;
+  --color-red-200: #6d3036;
+  --color-green-100: #163222;
+  --color-green-800: #a3e2bb;
+  --color-gray-100: #22303a;
+  --color-gray-600: #a3b1bc;
+  --color-gray-700: #c2ccd4;
+  --color-minus: #ff7b82;
+  --color-plus: #4cd38a;
+
+  --shadow-card: 0 2px 4px rgb(0 0 0 / .2), 0 12px 30px -18px rgb(0 0 0 / .6);
+}
+:root[data-theme="dark"] body {
+  background: radial-gradient(ellipse at 0% 30%, #12303d 0%, transparent 52%), radial-gradient(ellipse at 100% 70%, #11302a 0%, transparent 55%), #0e1a22;
+}
+:root[data-theme="dark"] ::selection { background: #2b5c58; color: #e4edf1; }
+:root[data-theme="dark"] .app-screen { background: radial-gradient(ellipse at 95% 0%, #1a2c36 0%, transparent 55%), linear-gradient(155deg, #121e26 0%, #111c23 53%, #12201f 100%); }
+@media (min-width: 560px) {
+  :root[data-theme="dark"] .app-screen { border-color: #ffffff12; box-shadow: 0 24px 85px -28px #00000080; }
+}
+:root[data-theme="dark"] .card { background: rgb(24 36 45 / .9); border-color: rgb(255 255 255 / .06); }
+:root[data-theme="dark"] .card-tint { background: linear-gradient(115deg, #1c3a4c 0%, #1b3b3e 52%, #1d3a2f 100%); border-color: #ffffff12; }
+:root[data-theme="dark"] .btn-primary { background: linear-gradient(120deg, #3f8090, #4f97a2); color: #08161c; border-color: #ffffff20; }
+:root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(120deg, #4a8f9e, #5aa6b0); }
+:root[data-theme="dark"] .btn-secondary { background: #1b2933e6; border-color: #2a3c48; box-shadow: none; }
+:root[data-theme="dark"] .field { background: #121c23; border-color: #2a3c48; box-shadow: none; }
+:root[data-theme="dark"] .field:focus { background: #152028; }
+:root[data-theme="dark"] .label { color: #c7d5de; }
+:root[data-theme="dark"] .chip { background: #1b2933; border-color: #263844; }
+:root[data-theme="dark"] .chip-on { background: linear-gradient(110deg, #234a5c, #24504b); color: #e4edf1; border-color: #2f5f63; }
+:root[data-theme="dark"] .peer-chip:checked + label { background: linear-gradient(115deg, #2f6e8f, #2d7477); color: #fff; border-color: #ffffff30; box-shadow: 0 0 0 2px #3b8aa8; }
+:root[data-theme="dark"] .h-title, :root[data-theme="dark"] .h-section { color: #e4edf1; }
+:root[data-theme="dark"] .avatar { box-shadow: 0 0 0 2px #152028, 0 0 0 4px #2b5c6a; }
+:root[data-theme="dark"] .toggle { background: #34454f; }
+:root[data-theme="dark"] .toggle:checked { background: #4f97a2; }
+:root[data-theme="dark"] .skill-icon { background: linear-gradient(135deg, #1e3d50, #1c3a44); color: #bfe0f5; }
+:root[data-theme="dark"] .mini-listing:nth-child(2n) .skill-icon { background: #1b3a30; }
+:root[data-theme="dark"] .coin-hero .btn-secondary { border-color: #2a3c48; background: #1b2933e6; }
+:root[data-theme="dark"] .bottom-nav::before { background: linear-gradient(transparent, #0e1a22e6 50%); }
+:root[data-theme="dark"] .nav-tray { background: #16222bcc; box-shadow: 0 5px 22px #00000060; }
+:root[data-theme="dark"] .nav-tab { border-color: #1b2933; box-shadow: none; background-color: #1b2933; }
+:root[data-theme="dark"] .nav-tab-active { background: linear-gradient(115deg, #24505a, #1f4c5c); color: #e4edf1; }
+:root[data-theme="dark"] :is(.bg-white, .bg-white\/90, .bg-white\/80, .bg-white\/70, .bg-white\/60, .bg-white\/50) { background-color: #ffffff14; }
+:root[data-theme="dark"] :is(.border-white, .border-white\/70) { border-color: #ffffff1f; }
+:root[data-theme="dark"] .ring-white { --tw-ring-color: #152028; }
+/* Welcome art */
+:root[data-theme="dark"] .welcome-halo { background: radial-gradient(ellipse, #183544 0%, #12262f60 50%, transparent 70%); }
+:root[data-theme="dark"] .welcome-stage { border-color: #1d3340; background: #183444; box-shadow: none; }
+:root[data-theme="dark"] .welcome-stage span:first-child { background: #1f4659; border-color: #1d3a49; }
+:root[data-theme="dark"] .welcome-wordmark { color: #e4edf1; }
+/* Admin console */
+:root[data-theme="dark"] .admin-shell { background: #0f1920; }
+:root[data-theme="dark"] :is(.admin-sidebar, .admin-drawer-content, .admin-mobile-bar) { background: #131e26; border-color: #22323d; }
+:root[data-theme="dark"] .admin-topbar { background: #131e26a6; border-color: #22323d; }
+:root[data-theme="dark"] .admin-workspace { background: #172630; border-color: #22323d; }
+:root[data-theme="dark"] .admin-nav-link { color: #a9bac6; }
+:root[data-theme="dark"] .admin-nav-link:hover { background: #1a2a33; color: #d5e4ea; }
+:root[data-theme="dark"] .admin-nav-link.is-active { background: #1b3a3a; color: #a6dadf; }
+:root[data-theme="dark"] .admin-sidebar-footer form { border-color: #22323d; }
+:root[data-theme="dark"] :is(.admin-panel, .admin-profile-hero, .admin-content .card) { background: #152028; border-color: #22323d; }
+:root[data-theme="dark"] .admin-content .field { background: #121c23; }
+:root[data-theme="dark"] .admin-title { color: #e4edf1; }
+:root[data-theme="dark"] .admin-profile-cover { background: radial-gradient(ellipse at 85% 130%, #1d3f37 0%, transparent 60%), linear-gradient(110deg, #18303b, #1a3230); }
+:root[data-theme="dark"] .admin-access-card { background: linear-gradient(130deg, #172e2c, #172a2c); border-color: #22403c; }
+:root[data-theme="dark"] .admin-detail-list > div { border-color: #22323d; }
+:root[data-theme="dark"] .admin-drawer-close { background: #1b2933; }
+
+/* Chat composer floats above the bottom nav. */
+.chat-composer { background: linear-gradient(transparent, #eef7f9 30%); }
+:root[data-theme="dark"] .chat-composer { background: linear-gradient(transparent, #111c23 30%); }

@@ -9,10 +9,12 @@ import { Icon } from "@/components/icons";
 import { ListingCard } from "@/components/listing-card";
 import { LocalTime } from "@/components/forms";
 import { PageHeader, Screen } from "@/components/ui";
+import { ExchangeExtras } from "../../exchanges/[id]/extras";
 
-export default async function PublicProfile({ params }: { params: Promise<{ username: string }> }) {
+export default async function PublicProfile({ params, searchParams }: { params: Promise<{ username: string }>; searchParams: Promise<{ exchange?: string }> }) {
   const { account, community } = await requireMember();
   const { username } = await params;
+  const { exchange: exchangeId } = await searchParams;
   const profile = await db.profile.findUnique({ where: { username: username.toLowerCase() }, include: { account: true } });
   if (!profile) notFound();
   // Profiles are visible only inside the same community.
@@ -27,6 +29,15 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     db.listing.findMany({ where: { ownerId: profile.accountId, communityId: community.id, status: "OPEN" }, include: { category: true, owner: { include: { profile: true } } }, take: 10 }),
   ]);
   const skills = [...categorySkills.map((s) => s.category.name), ...custom.map((s) => s.name)];
+
+  // Exchange-specific options (chat, review, sharing, report, block) show when
+  // you open this profile from an exchange, or for your most recent one with them.
+  const between = { OR: [{ requesterId: account.id, helperId: profile.accountId }, { requesterId: profile.accountId, helperId: account.id }] };
+  const sharedExchange = isMe ? null : await db.exchange.findFirst({
+    where: { ...between, ...(exchangeId && { id: exchangeId }) },
+    include: { listing: { select: { title: true } } },
+    orderBy: { updatedAt: "desc" },
+  }) ?? (exchangeId ? await db.exchange.findFirst({ where: between, include: { listing: { select: { title: true } } }, orderBy: { updatedAt: "desc" } }) : null);
 
   return (
     <Screen>
@@ -48,6 +59,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
       </div>
       {rep.reviewCount > 0 && rep.reviewCount < 3 && <p className="mt-2 text-center text-[12px] text-muted">Based on only {rep.reviewCount} review{rep.reviewCount === 1 ? "" : "s"} so far.</p>}
 
+      {sharedExchange && <ExchangeExtras ex={sharedExchange} viewerId={account.id} otherId={profile.accountId} otherName={profile.displayName} />}
       {skills.length > 0 && (
         <section className="mt-6"><h2 className="h-section mb-2">Skills</h2><div className="flex flex-wrap gap-2">{skills.map((s) => <span key={s} className="chip">{s}</span>)}</div></section>
       )}
@@ -68,7 +80,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
           </div>
         )}
       </section>
-      {!isMe && (
+      {!isMe && !sharedExchange && (
         <form action={blockMember} className="mt-8 text-center">
           <input type="hidden" name="accountId" value={profile.accountId} />
           <button className="btn-ghost text-minus"><Icon name="ban" size={18} /> Block {profile.displayName}</button>

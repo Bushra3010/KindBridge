@@ -193,6 +193,7 @@ export async function shareDetails(_: ActionState, fd: FormData): Promise<Action
   const account = await me();
   const res = await attempt(() => disclosure.grant(account.id, str(fd, "exchangeId"), fd.getAll("field").map(String)), "Shared. Only this member can see these details.");
   revalidatePath(`/exchanges/${str(fd, "exchangeId")}`);
+  revalidatePath("/u/[username]", "page");
   return res;
 }
 
@@ -201,6 +202,7 @@ export async function revokeGrant(fd: FormData) {
   await disclosure.revoke(account.id, str(fd, "grantId"));
   revalidatePath("/privacy");
   revalidatePath("/exchanges");
+  revalidatePath("/u/[username]", "page");
 }
 
 export async function blockMember(fd: FormData) {
@@ -293,6 +295,7 @@ export async function exchangeAction(_: ActionState, fd: FormData): Promise<Acti
     }
   });
   revalidatePath(`/exchanges/${id}`);
+  if (op === "review") revalidatePath("/u/[username]", "page");
   if (res?.error) return res;
   if (op === "accept") redirect(`/exchanges/${id}?booked=1`);
   return res;
@@ -312,6 +315,7 @@ export async function sendMessage(_: ActionState, fd: FormData): Promise<ActionS
       throw new AppError("Messaging is off between you and this member. Session actions and support remain available.");
     await db.message.create({ data: { exchangeId: id, senderId: account.id, body } });
     revalidatePath(`/exchanges/${id}`);
+    revalidatePath(`/exchanges/${id}/chat`);
   });
 }
 

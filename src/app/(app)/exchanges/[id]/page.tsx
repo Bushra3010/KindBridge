@@ -2,21 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
-import { blockMember, exchangeAction, revokeGrant, sendMessage, shareDetails } from "@/app/actions";
-import { visibleContact } from "@/lib/services/disclosure";
+import { exchangeAction } from "@/app/actions";
 import { reputation } from "@/lib/services/reviews";
 import { getOrCreateMemberAccount } from "@/lib/services/ledger";
-import { isBlockedEitherWay } from "@/lib/services/safety";
 import { maskContacts } from "@/lib/services/support";
-import { DISCLOSURE_FIELDS, FORMATS, REPORT_CATEGORIES, type DisclosureField, type Format } from "@/lib/constants";
+import { FORMATS, REPORT_CATEGORIES, type Format } from "@/lib/constants";
 import { ActionForm, DateBadge, DateTimeField, LocalTime, Submit } from "@/components/forms";
 import { Avatar } from "@/components/avatar";
 import { Coin } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { TermsFields } from "@/components/terms-fields";
 import { Note, Screen, StatusPill } from "@/components/ui";
-import { LiveRefresh, ScrollToEnd } from "./live";
-import { ShareDetails } from "./share";
+import { LiveRefresh } from "./live";
 
 const STEPS = ["PROPOSED", "ACCEPTED", "IN_PROGRESS", "DELIVERED", "COMPLETED"];
 const STEP_LABEL = ["Proposed", "Booked", "In progress", "Delivered", "Completed"];
@@ -42,7 +39,7 @@ export default async function ExchangePage({ params, searchParams }: { params: P
     include: {
       listing: { include: { category: true } },
       versions: { orderBy: { version: "desc" } },
-      messages: { orderBy: { createdAt: "asc" }, take: 200, include: { sender: { include: { profile: true } } } },
+      messages: { where: { kind: { not: "SYSTEM" } }, orderBy: { createdAt: "desc" }, take: 1 },
       requester: { include: { profile: true } },
       helper: { include: { profile: true } },
       reviews: true,
@@ -59,19 +56,13 @@ export default async function ExchangePage({ params, searchParams }: { params: P
   const terms = accepted ?? latest;
   const pendingChange = accepted && latest.id !== accepted.id && ex.status === "ACCEPTED" ? latest : null;
 
-  const [rep, wallet, sharedWithMe, myGrants, myContact, blocked] = await Promise.all([
-    reputation(other.id),
-    getOrCreateMemberAccount(db, ex.communityId, account.id),
-    visibleContact(account.id, other.id),
-    db.disclosureGrant.findMany({ where: { ownerId: account.id, recipientId: other.id, revokedAt: null } }),
-    db.privateContact.findUnique({ where: { accountId: account.id } }),
-    isBlockedEitherWay(db, account.id, other.id),
-  ]);
+  const [rep, wallet] = await Promise.all([reputation(other.id), getOrCreateMemberAccount(db, ex.communityId, account.id)]);
 
   const stepIndex = STEPS.indexOf(ex.status);
   const held = ["ACCEPTED", "IN_PROGRESS", "DELIVERED", "DISPUTED"].includes(ex.status);
   const canShare = ["ACCEPTED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "DISPUTED", "RESOLVED"].includes(ex.status);
   const myReview = ex.reviews.find((r) => r.authorId === account.id);
+  const lastMessage = ex.messages[0];
   const partialPendingForMe = ex.partialAmount !== null && held && (iAmRequester ? !ex.partialByReq : !ex.partialByHelper);
   const partialPendingForThem = ex.partialAmount !== null && held && !partialPendingForMe;
 
@@ -80,26 +71,14 @@ export default async function ExchangePage({ params, searchParams }: { params: P
       <LiveRefresh />
       <header className="flex items-center gap-3 pt-2">
         <Link href="/exchanges" aria-label="Back" className="grid size-10 place-items-center rounded-full bg-white/80 shadow-sm"><Icon name="left" /></Link>
-        <Link href={`/u/${other.profile?.username}`} className="flex flex-1 items-center gap-3">
+        <Link href={`/u/${other.profile?.username}?exchange=${ex.id}`} className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar preset={other.profile?.avatar} size={46} online={!other.profile?.paused} />
           <div>
             <p className="text-[18px] font-extrabold leading-tight">{otherName}</p>
             <p className="text-[13px] text-muted">{rep.rating ? `★ ${rep.rating} · ` : ""}{rep.completedHelp} sessions · {iAmRequester ? "Helping you" : "You're helping"}</p>
           </div>
         </Link>
-        <details className="relative">
-          <summary className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-white/80 shadow-sm" aria-label="More options">⋮</summary>
-          <div className="card absolute right-0 z-20 mt-2 w-52 overflow-hidden py-1 text-[14px]">
-            <Link href={`/report?type=EXCHANGE&id=${ex.id}`} className="flex items-center gap-2 px-4 py-3 hover:bg-mist"><Icon name="flag" size={18} /> Report</Link>
-            {!blocked && (
-              <form action={blockMember}>
-                <input type="hidden" name="accountId" value={other.id} />
-                <input type="hidden" name="next" value={`/exchanges/${ex.id}`} />
-                <button className="flex w-full items-center gap-2 px-4 py-3 text-left text-minus hover:bg-red-50"><Icon name="ban" size={18} /> Block {otherName}</button>
-              </form>
-            )}
-          </div>
-        </details>
+        <Link href={`/exchanges/${ex.id}/chat`} className="btn-primary btn-sm shrink-0"><Icon name="chat" size={18} /> Chat</Link>
       </header>
 
       {booked && ex.status === "ACCEPTED" && (
@@ -279,25 +258,7 @@ export default async function ExchangePage({ params, searchParams }: { params: P
         )}
 
         {ex.status === "COMPLETED" && !myReview && (
-          <div className="card space-y-3 p-4">
-            <p className="font-bold">How did it go?</p>
-            <ActionForm action={exchangeAction} className="space-y-3">
-              <input type="hidden" name="exchangeId" value={ex.id} />
-              <input type="hidden" name="op" value="review" />
-              <fieldset className="flex justify-center gap-1" aria-label="Rating">
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <span key={n} className="contents">
-                    <input type="radio" name="rating" value={n} id={`r${n}`} defaultChecked={n === 5} className="peer-chip sr-only" required />
-                    <label htmlFor={`r${n}`} className="chip cursor-pointer px-3">{n}★</label>
-                  </span>
-                ))}
-              </fieldset>
-              <textarea name="body" rows={2} className="field" placeholder="A short, honest review (public)" maxLength={500} aria-label="Review" />
-              <textarea name="thanks" rows={2} className="field" placeholder={`A private thank-you note for ${otherName} (optional)`} maxLength={500} aria-label="Private thank-you note" />
-              <Note>Don't include names, addresses or contact details. Reviews publish after you both submit, or after 7 days.</Note>
-              <Submit>Submit review</Submit>
-            </ActionForm>
-          </div>
+          <Link href={`/u/${other.profile?.username}?exchange=${ex.id}#review`} className="card flex items-center gap-3 p-4"><Icon name="award" className="text-teal-700" /><span className="flex-1 font-bold">How did it go? Review {otherName}</span><Icon name="right" className="text-muted" /></Link>
         )}
         {ex.status === "COMPLETED" && myReview && <p className="card p-4 text-center text-[14px] text-ink-soft">Thanks for your review. {ex.reviews.length < 2 ? "It will publish once both reviews are in or after 7 days." : "Both reviews are published."}</p>}
         {ex.status === "COMPLETED" && iAmRequester === false && (
@@ -305,84 +266,23 @@ export default async function ExchangePage({ params, searchParams }: { params: P
         )}
       </section>
 
-      {/* Privacy */}
-      {canShare && (
-        <section className="mt-6 space-y-3">
-          {Object.keys(sharedWithMe).length > 0 && (
-            <div className="card p-4">
-              <h2 className="mb-2 font-extrabold">{otherName} shared with you</h2>
-              <dl className="space-y-1.5">
-                {Object.entries(sharedWithMe).map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-3 text-[14px]">
-                    <dt className="text-muted">{DISCLOSURE_FIELDS[k as DisclosureField].label}</dt>
-                    <dd className="font-semibold">{k === "PHOTO" ? <a className="text-teal-700 underline" href={v} target="_blank" rel="noreferrer noopener">View photo</a> : v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-          <details className="card overflow-hidden" open={myGrants.length > 0 ? undefined : undefined}>
-            <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
-              <Icon name="shield" className="text-teal-700" />
-              <span className="flex-1"><span className="block font-extrabold">Share on your terms</span><span className="block text-[13px] text-muted">Only with {otherName}{myGrants.length ? ` · ${myGrants.length} shared` : ""}</span></span>
-              <Icon name="down" size={18} className="text-muted" />
-            </summary>
-            <div className="border-t border-line px-4 pb-4">
-              <ShareDetails
-                action={shareDetails}
-                exchangeId={ex.id}
-                recipient={otherName}
-                values={{ FIRST_NAME: myContact?.firstName ?? null, PHOTO: myContact?.photoUrl ?? null, PHONE: myContact?.phone ?? null, MEETING_LOCATION: myContact?.meetingLocation ?? null }}
-                alreadyShared={myGrants.map((g) => g.field)}
-              />
-              {myGrants.length > 0 && (
-                <div className="mt-4 space-y-2 border-t border-line pt-3">
-                  <p className="text-[13px] font-bold text-ink-soft">Currently shared</p>
-                  {myGrants.map((g) => (
-                    <form key={g.id} action={revokeGrant} className="flex items-center justify-between text-[14px]">
-                      <input type="hidden" name="grantId" value={g.id} />
-                      <span>{DISCLOSURE_FIELDS[g.field as DisclosureField].label}</span>
-                      <button className="btn-ghost btn-sm">Stop sharing</button>
-                    </form>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
-        </section>
-      )}
-
-      {/* Chat */}
-      <section className="mt-6" aria-label="Conversation">
-        <h2 className="h-section mb-3">Chat</h2>
-        <div className="space-y-2">
-          {ex.messages.map((m) =>
-            m.kind === "SYSTEM" ? (
-              <p key={m.id} className="mx-auto max-w-[85%] text-center text-[12px] text-muted">{m.body}</p>
-            ) : (
-              <div key={m.id} className={`flex ${m.senderId === account.id ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-3xl px-4 py-2.5 text-[15px] ${m.senderId === account.id ? "rounded-br-lg bg-gradient-to-br from-sky-100 to-teal-100" : "rounded-bl-lg bg-white shadow-sm"}`}>
-                  <p className="whitespace-pre-line">{m.body}</p>
-                  <p className="mt-0.5 text-right text-[11px] text-muted"><LocalTime iso={m.createdAt.toISOString()} mode="time" /></p>
-                </div>
-              </div>
-            ),
-          )}
-          <ScrollToEnd dep={ex.messages.length} />
-        </div>
-        {blocked ? (
-          <p className="mt-3 rounded-2xl bg-mist p-3 text-center text-[13px] text-muted">Messaging is off. Session actions, reporting and support stay available.</p>
-        ) : (
-          <ActionForm action={sendMessage} resetOnSuccess className="mt-3">
-            <input type="hidden" name="exchangeId" value={ex.id} />
-            <div className="flex items-end gap-2">
-              <label htmlFor="body" className="sr-only">Message</label>
-              <textarea id="body" name="body" rows={1} className="field flex-1 resize-none rounded-3xl" placeholder="Write a message…" maxLength={2000} required />
-              <Submit className="btn-primary size-12 shrink-0 p-0"><Icon name="send" size={20} /><span className="sr-only">Send</span></Submit>
-            </div>
-            <p className="mt-2 text-[12px] text-muted">No need to share your phone number. Never share passwords or one-time codes.</p>
-          </ActionForm>
-        )}
+      <section className="mt-6 space-y-3">
+        <Link href={`/exchanges/${ex.id}/chat`} className="card flex items-center gap-3 p-4">
+          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon name="chat" /></div>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">Chat with {otherName}</p>
+            <p className="truncate text-[13px] text-muted">{lastMessage ? `${lastMessage.senderId === account.id ? "You: " : ""}${lastMessage.body}` : "No messages yet"}</p>
+          </div>
+          <Icon name="right" className="text-muted" />
+        </Link>
+        <Link href={`/u/${other.profile?.username}?exchange=${ex.id}`} className="card flex items-center gap-3 p-4">
+          <Avatar preset={other.profile?.avatar} size={44} />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">{otherName}&apos;s profile</p>
+            <p className="text-[13px] text-muted">{canShare ? "Share details, review, report or block" : "Reviews, skills, report or block"}</p>
+          </div>
+          <Icon name="right" className="text-muted" />
+        </Link>
       </section>
       <p className="mt-6 text-center text-[12px] text-muted">{FORMATS[ex.listing.format as Format]}{ex.listing.category.active && <> · {ex.listing.category.name}</>} · Listing: <Link className="underline" href={`/listings/${ex.listingId}`}>{ex.listing.title}</Link></p>
     </Screen>

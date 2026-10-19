@@ -2,6 +2,7 @@ import { requireMember } from "@/lib/auth";
 import { logout, requestDeletion, updateNotificationPrefs } from "@/app/actions";
 import { ActionForm, Submit } from "@/components/forms";
 import { Icon } from "@/components/icons";
+import { ThemePicker } from "@/components/theme-picker";
 import { Note, PageHeader, Row, Screen } from "@/components/ui";
 
 export const metadata = { title: "Settings & support" };
@@ -21,6 +22,10 @@ export default async function Settings() {
             <Submit className="btn-secondary btn-sm w-full">Save preferences</Submit>
           </ActionForm>
         </details>
+        <div className="px-4 py-3.5">
+          <p className="mb-2.5 flex items-center gap-3 font-semibold"><Icon name="moon" className="text-ink-soft" /> Appearance</p>
+          <ThemePicker />
+        </div>
         <Row href="/privacy" icon="shield" label="Privacy & sharing" />
         <Row href="/onboarding/skills?next=/settings" icon="sparkle" label="Skills & availability" />
       </div>
