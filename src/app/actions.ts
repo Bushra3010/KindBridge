@@ -8,6 +8,7 @@ import { AppError } from "@/lib/errors";
 import { attempt, type ActionState } from "@/lib/action";
 import { createSession, currentAccount, destroySession, hashPassword, newVerifyCode, verifyLogin } from "@/lib/auth";
 import { AVATAR_KEYS } from "@/components/avatar";
+import { CUSTOM_SKILL_MAX, CUSTOM_SKILL_MAX_LEN } from "@/lib/constants";
 import * as exchanges from "@/lib/services/exchanges";
 import * as disclosure from "@/lib/services/disclosure";
 import * as safety from "@/lib/services/safety";
@@ -110,16 +111,38 @@ export async function joinCommunity(_: ActionState, fd: FormData): Promise<Actio
   redirect("/onboarding/skills");
 }
 
+/** Free-text skills: trimmed, de-duplicated, capped, and kept free of contact details. */
+function customSkills(fd: FormData, key: string) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of fd.getAll(key)) {
+    const name = String(raw).trim().replace(/\s+/g, " ");
+    if (!name || seen.has(name.toLowerCase())) continue;
+    if (name.length > CUSTOM_SKILL_MAX_LEN) throw new AppError(`Keep each skill under ${CUSTOM_SKILL_MAX_LEN} characters.`);
+    if (/@|https?:|www\.|\d{5,}/i.test(name)) throw new AppError("Skills can't include links, emails or phone numbers.");
+    seen.add(name.toLowerCase());
+    out.push(name);
+  }
+  if (out.length > CUSTOM_SKILL_MAX) throw new AppError(`Add up to ${CUSTOM_SKILL_MAX} of your own skills in each section.`);
+  return out;
+}
+
 export async function saveSkills(_: ActionState, fd: FormData): Promise<ActionState> {
   const account = await me();
   const offer = fd.getAll("offer").map(String);
   const need = fd.getAll("need").map(String);
   const res = await attempt(async () => {
-    if (offer.length === 0) throw new AppError("Pick at least one skill you can share.");
+    const offerCustom = customSkills(fd, "offerCustom");
+    const needCustom = customSkills(fd, "needCustom");
+    if (offer.length + offerCustom.length === 0) throw new AppError("Pick at least one skill you can share.");
     await transaction(async (tx) => {
       await tx.userSkill.deleteMany({ where: { accountId: account.id } });
       await tx.userSkill.createMany({
         data: [...offer.map((categoryId) => ({ accountId: account.id, categoryId, kind: "OFFER" })), ...need.map((categoryId) => ({ accountId: account.id, categoryId, kind: "NEED" }))],
+      });
+      await tx.customSkill.deleteMany({ where: { accountId: account.id } });
+      await tx.customSkill.createMany({
+        data: [...offerCustom.map((name) => ({ accountId: account.id, name, kind: "OFFER" })), ...needCustom.map((name) => ({ accountId: account.id, name, kind: "NEED" }))],
       });
       await tx.profile.update({ where: { accountId: account.id }, data: { availability: str(fd, "availability") || "Flexible", onboardedAt: new Date() } });
     });
@@ -206,6 +229,7 @@ export async function requestDeletion(_: ActionState): Promise<ActionState> {
       // Pseudonymize the public profile; keep ledger and case records (PRD §9).
       await tx.profile.update({ where: { accountId: account.id }, data: { displayName: "Former member", username: `closed-${account.id}`, bio: "", paused: true } });
       await tx.privateContact.deleteMany({ where: { accountId: account.id } });
+      await tx.customSkill.deleteMany({ where: { accountId: account.id } });
       await tx.disclosureGrant.updateMany({ where: { ownerId: account.id, revokedAt: null }, data: { revokedAt: new Date() } });
       await tx.listing.updateMany({ where: { ownerId: account.id, status: { in: ["OPEN", "PAUSED"] } }, data: { status: "CLOSED" } });
       await tx.account.update({ where: { id: account.id }, data: { status: "CLOSED", email: `closed+${account.id}@kindbridge.invalid` } });

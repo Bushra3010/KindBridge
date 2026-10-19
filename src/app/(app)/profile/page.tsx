@@ -12,15 +12,16 @@ export const metadata = { title: "Your profile" };
 
 export default async function Profile() {
   const { account, profile, community, membership } = await requireMember();
-  const [rep, wallet, skills, monthHelped, thanks] = await Promise.all([
+  const [rep, wallet, skills, custom, monthHelped, thanks] = await Promise.all([
     reputation(account.id),
     getOrCreateMemberAccount(db, community.id, account.id),
     db.userSkill.findMany({ where: { accountId: account.id }, include: { category: true } }),
+    db.customSkill.findMany({ where: { accountId: account.id }, orderBy: { id: "asc" } }),
     db.exchange.findMany({ where: { helperId: account.id, status: "COMPLETED", completedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } }, select: { requesterId: true }, distinct: ["requesterId"] }),
     db.review.findMany({ where: { subjectId: account.id, thanks: { not: "" } }, include: { author: { include: { profile: true } } }, orderBy: { createdAt: "desc" }, take: 3 }),
   ]);
-  const offers = skills.filter((s) => s.kind === "OFFER");
-  const needs = skills.filter((s) => s.kind === "NEED");
+  const offers = [...skills.filter((s) => s.kind === "OFFER").map((s) => s.category.name), ...custom.filter((s) => s.kind === "OFFER").map((s) => s.name)];
+  const needs = [...skills.filter((s) => s.kind === "NEED").map((s) => s.category.name), ...custom.filter((s) => s.kind === "NEED").map((s) => s.name)];
   const isStaff = ["MODERATOR", "ADMIN", "COIN_ADMIN"].includes(account.role);
 
   return (
@@ -60,11 +61,11 @@ export default async function Profile() {
 
       <section className="mt-6">
         <div className="mb-2 flex items-center justify-between"><h2 className="h-section">Skills you offer</h2><Link href="/onboarding/skills?next=/profile" className="text-[14px] font-bold text-teal-700">Edit</Link></div>
-        <div className="flex flex-wrap gap-2">{offers.map((s) => <span key={s.categoryId} className="chip">{s.category.name}</span>)}{offers.length === 0 && <span className="text-[14px] text-muted">None yet</span>}</div>
+        <div className="flex flex-wrap gap-2">{offers.map((s) => <span key={s} className="chip">{s}</span>)}{offers.length === 0 && <span className="text-[14px] text-muted">None yet</span>}</div>
         {needs.length > 0 && (
           <>
             <h2 className="h-section mb-2 mt-4">Looking for help with</h2>
-            <div className="flex flex-wrap gap-2">{needs.map((s) => <span key={s.categoryId} className="chip">{s.category.name}</span>)}</div>
+            <div className="flex flex-wrap gap-2">{needs.map((s) => <span key={s} className="chip">{s}</span>)}</div>
           </>
         )}
       </section>

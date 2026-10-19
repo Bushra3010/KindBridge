@@ -20,11 +20,13 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
   if (!shared || profile.account.status === "CLOSED") notFound();
 
   const isMe = profile.accountId === account.id;
-  const [rep, skills, listings] = await Promise.all([
+  const [rep, categorySkills, custom, listings] = await Promise.all([
     reputation(profile.accountId),
     db.userSkill.findMany({ where: { accountId: profile.accountId, kind: "OFFER" }, include: { category: true } }),
+    db.customSkill.findMany({ where: { accountId: profile.accountId, kind: "OFFER" }, orderBy: { id: "asc" } }),
     db.listing.findMany({ where: { ownerId: profile.accountId, communityId: community.id, status: "OPEN" }, include: { category: true, owner: { include: { profile: true } } }, take: 10 }),
   ]);
+  const skills = [...categorySkills.map((s) => s.category.name), ...custom.map((s) => s.name)];
 
   return (
     <Screen>
@@ -47,7 +49,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
       {rep.reviewCount > 0 && rep.reviewCount < 3 && <p className="mt-2 text-center text-[12px] text-muted">Based on only {rep.reviewCount} review{rep.reviewCount === 1 ? "" : "s"} so far.</p>}
 
       {skills.length > 0 && (
-        <section className="mt-6"><h2 className="h-section mb-2">Skills</h2><div className="flex flex-wrap gap-2">{skills.map((s) => <span key={s.categoryId} className="chip">{s.category.name}</span>)}</div></section>
+        <section className="mt-6"><h2 className="h-section mb-2">Skills</h2><div className="flex flex-wrap gap-2">{skills.map((s) => <span key={s} className="chip">{s}</span>)}</div></section>
       )}
       {listings.length > 0 && (
         <section className="mt-6"><h2 className="h-section mb-2">Active listings</h2><div className="space-y-3">{listings.map((l) => <ListingCard key={l.id} listing={l} />)}</div></section>

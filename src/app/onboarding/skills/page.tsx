@@ -6,6 +6,7 @@ import { AVAILABILITY_OPTIONS } from "@/lib/constants";
 import { ActionForm, Submit } from "@/components/forms";
 import { Icon } from "@/components/icons";
 import { SkillChips } from "@/components/skill-chips";
+import { CustomSkills } from "@/components/custom-skills";
 import { PageHeader, Screen } from "@/components/ui";
 
 export const metadata = { title: "What can you share?" };
@@ -14,12 +15,15 @@ export default async function Skills({ searchParams }: { searchParams: Promise<{
   const account = await currentAccount();
   if (!account) redirect("/login");
   const { next } = await searchParams;
-  const [categories, mine] = await Promise.all([
+  const [categories, mine, custom] = await Promise.all([
     db.skillCategory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     db.userSkill.findMany({ where: { accountId: account.id } }),
+    db.customSkill.findMany({ where: { accountId: account.id }, orderBy: { id: "asc" } }),
   ]);
   const offer = mine.filter((s) => s.kind === "OFFER").map((s) => s.categoryId);
   const need = mine.filter((s) => s.kind === "NEED").map((s) => s.categoryId);
+  const offerCustom = custom.filter((s) => s.kind === "OFFER").map((s) => s.name);
+  const needCustom = custom.filter((s) => s.kind === "NEED").map((s) => s.name);
 
   return (
     <Screen nav={false}>
@@ -39,11 +43,13 @@ export default async function Skills({ searchParams }: { searchParams: Promise<{
           <h1 className="text-[24px] font-extrabold">What can you share?</h1>
           <p className="mb-3 text-ink-soft">Select a few skills to get started.</p>
           <SkillChips name="offer" categories={categories} selected={offer} />
+          <CustomSkills name="offerCustom" initial={offerCustom} label="Add another skill you can share" />
         </section>
         <section>
           <h2 className="text-[20px] font-extrabold">What would you like help with?</h2>
           <p className="mb-3 text-ink-soft">Choose a few areas where you'd like support.</p>
           <SkillChips name="need" categories={categories} selected={need} />
+          <CustomSkills name="needCustom" initial={needCustom} label="Add something else you'd like help with" />
         </section>
         <section>
           <label htmlFor="availability" className="h-section mb-2 block">When are you available?</label>

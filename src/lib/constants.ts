@@ -19,6 +19,8 @@ export const DISCLOSURE_FIELDS = {
 export type DisclosureField = keyof typeof DISCLOSURE_FIELDS;
 
 export const AVAILABILITY_OPTIONS = ["Weekday mornings", "Weekday evenings", "Weekends", "Flexible"];
+export const CUSTOM_SKILL_MAX = 5; // per kind (offer / need)
+export const CUSTOM_SKILL_MAX_LEN = 30;
 export const DURATIONS = [15, 30, 45, 60, 90, 120];
 
 export const REPORT_CATEGORIES = [
