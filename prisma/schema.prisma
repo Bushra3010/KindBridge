@@ -1,15 +1,18 @@
 // KindBridge P0 data model (PRD §13).
-// SQLite for local development; string columns stand in for enums so the
-// schema ports to Postgres without changes. Allowed values are documented
-// inline and enforced in src/lib/constants.ts.
+// Postgres on Supabase. String columns stand in for enums; allowed values are
+// documented inline and enforced in src/lib/constants.ts.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Load `include`d relations with SQL joins in one round trip instead of one
+  // query per relation; the database is remote, so round trips dominate.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ── Accounts & identity ────────────────────────────────────────────────
@@ -19,7 +22,10 @@ model Account {
   email            String    @unique
   passwordHash     String
   emailVerifiedAt  DateTime?
-  verifyCode       String?
+  verifyCode       String? // sha256 of the emailed 6-digit code
+  verifyExpiresAt  DateTime?
+  verifySentAt     DateTime?
+  verifyAttempts   Int       @default(0)
   adultConfirmedAt DateTime?
   rulesAcceptedAt  DateTime?
   role             String    @default("MEMBER") // MEMBER | MODERATOR | COIN_ADMIN | ADMIN

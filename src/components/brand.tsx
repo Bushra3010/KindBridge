@@ -1,4 +1,5 @@
 import { useId } from "react";
+import Image from "next/image";
 
 /** Three-band arch — the "bridge". */
 export function LogoMark({ size = 40 }: { size?: number }) {
@@ -17,10 +18,15 @@ export function LogoMark({ size = 40 }: { size?: number }) {
 
 export function Logo({ size = 28 }: { size?: number }) {
   return (
-    <span className="inline-flex items-center gap-2">
-      <LogoMark size={size * 1.4} />
-      <span className="font-extrabold tracking-tight text-ink" style={{ fontSize: size }}>KindBridge</span>
-    </span>
+    <Image
+      src="/design/logo.png"
+      alt="KindBridge"
+      width={512}
+      height={171}
+      priority
+      className="inline-block h-auto max-w-full"
+      style={{ width: size * 9 }}
+    />
   );
 }
 

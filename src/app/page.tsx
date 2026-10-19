@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentAccount } from "@/lib/auth";
-import { Coin } from "@/components/brand";
+import { Coin, Logo } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { WelcomeArt } from "@/components/welcome-art";
 import { Screen } from "@/components/ui";
@@ -12,11 +12,11 @@ export default async function Welcome() {
     <Screen nav={false}>
       <div className="welcome-content flex min-h-[calc(100dvh-74px)] flex-col items-center text-center">
         <WelcomeArt />
-        <div className="mt-4"><span className="welcome-wordmark">KindBridge</span></div>
-        <h1 className="mt-5 text-[32px] font-extrabold leading-tight tracking-tight">A little help goes<br />a long way.</h1>
+        <div className="welcome-logo mt-4"><Logo size={34} /></div>
+        <h1 className="welcome-title mt-5 text-[32px] font-extrabold leading-tight tracking-tight">A little help goes<br />a long way.</h1>
         <p className="mt-2 text-[16px] text-ink-soft">Share skills. Earn coins. Find support.</p>
 
-        <ol className="mt-7 flex w-full items-start justify-center gap-2" aria-label="How it works">
+        <ol className="welcome-steps mt-7 flex w-full items-start justify-center gap-2" aria-label="How it works">
           {[
             { icon: <Icon name="users" size={28} />, label: "Help someone", tone: "bg-sky-100 text-sky-900" },
             { icon: <Coin size={34} />, label: "Earn coins", tone: "bg-amber-50" },
@@ -32,7 +32,7 @@ export default async function Welcome() {
           ))}
         </ol>
 
-        <div className="mt-auto w-full space-y-2.5 pt-8">
+        <div className="welcome-actions mt-auto w-full space-y-2.5 pt-8">
           <Link href="/signup" className="btn-primary w-full">Get started <Icon name="right" size={18} /></Link>
           <Link href="/login" className="btn-secondary w-full">I already have an account</Link>
           <p className="pt-1 text-[12px] text-muted">An 18+ community · <Link href="/rules" className="underline">Community rules</Link></p>

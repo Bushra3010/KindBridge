@@ -15,6 +15,8 @@ export default async function Skills({ searchParams }: { searchParams: Promise<{
   const account = await currentAccount();
   if (!account) redirect("/login");
   const { next } = await searchParams;
+  // Members are placed in the pilot community before skills; see /onboarding/community.
+  if (!(await db.membership.findFirst({ where: { accountId: account.id, status: "APPROVED" } }))) redirect("/onboarding/community");
   const [categories, mine, custom] = await Promise.all([
     db.skillCategory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     db.userSkill.findMany({ where: { accountId: account.id } }),
@@ -29,11 +31,11 @@ export default async function Skills({ searchParams }: { searchParams: Promise<{
     <Screen nav={false}>
       <PageHeader
         title=""
-        back={next ?? "/onboarding/community"}
+        back={next}
         right={!next && (
           <div className="text-right text-[13px] font-semibold text-ink-soft">
-            Step 3 of 3
-            <div className="mt-1 flex items-center gap-1"><span className="size-2 rounded-full bg-teal-600" /><span className="h-0.5 w-5 bg-teal-200" /><span className="size-2 rounded-full bg-teal-600" /><span className="h-0.5 w-5 bg-teal-200" /><span className="size-3 rounded-full bg-teal-600 ring-4 ring-teal-100" /></div>
+            Step 2 of 2
+            <div className="mt-1 flex items-center gap-1"><span className="size-2 rounded-full bg-teal-600" /><span className="h-0.5 w-5 bg-teal-200" /><span className="size-3 rounded-full bg-teal-600 ring-4 ring-teal-100" /></div>
           </div>
         )}
       />

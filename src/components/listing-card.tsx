@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Coin } from "./brand";
 import { Icon } from "./icons";
-import { CATEGORY_ICON } from "./ui";
+import { categoryIcon } from "./ui";
 import { FORMATS, type Format } from "@/lib/constants";
 
 type L = {
@@ -29,7 +29,7 @@ export function ListingCard({ listing, why }: { listing: L; why?: string }) {
         </div>
         {why && <div className="mt-1 text-[12px] font-semibold text-teal-700">✓ {why}</div>}
       </div>
-      <Icon name={CATEGORY_ICON[listing.category.slug] ?? "sparkle"} className="shrink-0 text-teal-600" />
+      <Icon name={categoryIcon(listing.category)} className="shrink-0 text-teal-600" />
     </Link>
   );
 }
@@ -37,7 +37,7 @@ export function ListingCard({ listing, why }: { listing: L; why?: string }) {
 export function MiniListingCard({ listing }: { listing: L }) {
   return (
     <Link href={`/listings/${listing.id}`} className="mini-listing card flex w-44 shrink-0 flex-col gap-3 p-4 transition hover:shadow-lg">
-      <div className="skill-icon grid size-11 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon name={CATEGORY_ICON[listing.category.slug] ?? "sparkle"} /></div>
+      <div className="skill-icon grid size-11 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon name={categoryIcon(listing.category)} /></div>
       <div className="line-clamp-2 min-h-[2.5em] text-[15px] font-bold leading-tight">{listing.title}</div>
       <div className="flex items-center gap-1 text-[12px] text-muted"><Coin size={13} />{listing.coins} coins · {listing.durationMin} min</div>
     </Link>

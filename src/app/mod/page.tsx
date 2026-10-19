@@ -19,7 +19,7 @@ export default async function Mod() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-4">
-      <PageHeader title="Moderation" back="/profile" subtitle={`Signed in as ${me.role.toLowerCase().replace("_", " ")}`} />
+      <PageHeader title="Moderation" back={["ADMIN", "COIN_ADMIN"].includes(me.role) ? "/admin" : "/profile"} subtitle={`Signed in as ${me.role.toLowerCase().replace("_", " ")}`} />
       <section className={`card mb-6 p-4 ${recon.ok ? "" : "border-2 border-minus"}`}>
         <h2 className="font-extrabold">Ledger reconciliation {recon.ok ? "✓ balanced" : "⚠ problems found"}</h2>
         <p className="text-[14px] text-ink-soft">Issued {recon.totals.issued} · available {recon.totals.available} · held {recon.totals.reserved} · transferred {recon.totals.transferred}</p>

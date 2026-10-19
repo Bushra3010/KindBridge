@@ -11,7 +11,7 @@ import { Avatar } from "@/components/avatar";
 import { Coin } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { TermsFields } from "@/components/terms-fields";
-import { CATEGORY_ICON, EmptyState, Note, PageHeader, Screen, StatusPill } from "@/components/ui";
+import { categoryIcon, EmptyState, Note, PageHeader, Screen, StatusPill } from "@/components/ui";
 
 export default async function ListingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ posted?: string }> }) {
   const { account, community } = await requireMember();
@@ -40,7 +40,7 @@ export default async function ListingPage({ params, searchParams }: { params: Pr
         />
         {posted && <p role="status" className="mb-4 rounded-2xl bg-teal-50 px-4 py-3 text-[14px] font-semibold text-teal-800">Published. Members of {community.name} can now see it.</p>}
         <div className="card-tint flex items-start gap-3 p-4">
-          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-white/70 text-teal-700"><Icon name={CATEGORY_ICON[listing.category.slug] ?? "sparkle"} /></div>
+          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-white/70 text-teal-700"><Icon name={categoryIcon(listing.category)} /></div>
           <div className="flex-1">
             <p className="text-[17px] font-bold">{listing.title}</p>
             <p className="text-[13px] text-ink-soft">{listing.coins} coins · {listing.durationMin} min · {FORMATS[listing.format as Format]}</p>

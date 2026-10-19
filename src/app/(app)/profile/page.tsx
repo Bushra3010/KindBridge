@@ -33,7 +33,7 @@ export default async function Profile() {
           <p className="text-[14px] text-muted">@{profile.username}</p>
           {profile.bio && <p className="mt-1 text-[14px] text-ink-soft">{profile.bio}</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="pill bg-teal-50 text-teal-800" title="Email address confirmed. This is not an identity check."><Icon name="checkCircle" size={14} /> Contact verified</span>
+            {account.emailVerifiedAt && <span className="pill bg-teal-50 text-teal-800" title="Email address confirmed. This is not an identity check."><Icon name="checkCircle" size={14} /> Contact verified</span>}
             <span className="pill bg-sky-50 text-sky-900" title="Approved member of this community"><Icon name="users" size={14} /> {community.name}</span>
             {profile.paused && <span className="pill bg-gray-100 text-gray-700"><Icon name="pause" size={14} /> Paused</span>}
           </div>
@@ -90,6 +90,7 @@ export default async function Profile() {
         <Link href="/privacy" className="flex items-center gap-3 px-4 py-3.5 hover:bg-mist"><Icon name="shield" className="text-ink-soft" /><span className="flex-1 font-semibold">Privacy & sharing</span><Icon name="right" size={18} className="text-muted" /></Link>
         {membership.role === "ORGANIZER" && <Link href="/organizer" className="flex items-center gap-3 px-4 py-3.5 hover:bg-mist"><Icon name="users" className="text-ink-soft" /><span className="flex-1 font-semibold">Organizer tools</span><Icon name="right" size={18} className="text-muted" /></Link>}
         {isStaff && <Link href="/mod" className="flex items-center gap-3 px-4 py-3.5 hover:bg-mist"><Icon name="shieldCheck" className="text-ink-soft" /><span className="flex-1 font-semibold">Moderation</span><Icon name="right" size={18} className="text-muted" /></Link>}
+        {["ADMIN", "COIN_ADMIN"].includes(account.role) && <Link href="/admin" className="flex items-center gap-3 px-4 py-3.5 hover:bg-mist"><Icon name="settings" className="text-ink-soft" /><span className="flex-1 font-semibold">Admin console</span><Icon name="right" size={18} className="text-muted" /></Link>}
       </div>
     </Screen>
   );

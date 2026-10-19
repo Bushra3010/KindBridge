@@ -6,16 +6,18 @@ import { z } from "zod";
 import { db, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { attempt, type ActionState } from "@/lib/action";
-import { createSession, currentAccount, destroySession, hashPassword, newVerifyCode, verifyLogin } from "@/lib/auth";
+import { createSession, currentAccount, destroySession, hashPassword, verifyLogin } from "@/lib/auth";
+import { checkVerificationCode, sendVerificationCode } from "@/lib/services/verification";
 import { AVATAR_KEYS } from "@/components/avatar";
 import { CUSTOM_SKILL_MAX, CUSTOM_SKILL_MAX_LEN } from "@/lib/constants";
 import * as exchanges from "@/lib/services/exchanges";
 import * as disclosure from "@/lib/services/disclosure";
 import * as safety from "@/lib/services/safety";
+import * as admin from "@/lib/services/admin";
 import { createListing, setListingStatus } from "@/lib/services/listings";
-import { decideMembership, maybeGrantStarter, requestMembership } from "@/lib/services/membership";
+import { decideMembership, maybeGrantStarter } from "@/lib/services/membership";
 import { submitReview } from "@/lib/services/reviews";
-import { reverse } from "@/lib/services/ledger";
+import { correct } from "@/lib/services/ledger";
 import { audit } from "@/lib/services/support";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -44,6 +46,7 @@ const signupSchema = z.object({
 });
 
 export async function signup(_: ActionState, fd: FormData): Promise<ActionState> {
+  let accountId = "";
   const res = await attempt(async () => {
     const d = signupSchema.parse(Object.fromEntries(fd));
     const lower = d.username.toLowerCase();
@@ -55,7 +58,6 @@ export async function signup(_: ActionState, fd: FormData): Promise<ActionState>
       data: {
         email: d.email.toLowerCase(),
         passwordHash: await hashPassword(d.password),
-        verifyCode: newVerifyCode(),
         adultConfirmedAt: now,
         rulesAcceptedAt: now,
         profile: { create: { username: lower, displayName: d.username, avatar: d.avatar } },
@@ -63,20 +65,22 @@ export async function signup(_: ActionState, fd: FormData): Promise<ActionState>
       },
     });
     await createSession(account.id);
+    accountId = account.id;
   });
   if (res?.error) return res;
+  // Preserve the account if delivery fails; /verify offers a retry.
+  await sendVerificationCode(accountId).catch((e) => console.error("verification email failed", e));
   redirect("/verify");
 }
 
 export async function verifyEmail(_: ActionState, fd: FormData): Promise<ActionState> {
   const account = await me();
   const res = await attempt(async () => {
-    if (str(fd, "code") !== account.verifyCode) throw new AppError("That code doesn't match. Check your email and try again.");
+    await checkVerificationCode(account.id, str(fd, "code"));
     await transaction(async (tx) => {
-      await tx.account.update({ where: { id: account.id }, data: { emailVerifiedAt: new Date(), verifyCode: null } });
-      // A member approved before verifying becomes starter-eligible now.
-      const m = await tx.membership.findFirst({ where: { accountId: account.id, status: "APPROVED" } });
-      if (m) await maybeGrantStarter(tx, m.id);
+      await tx.account.update({ where: { id: account.id }, data: { emailVerifiedAt: new Date(), verifyCode: null, verifyExpiresAt: null, verifyAttempts: 0 } });
+      const membership = await tx.membership.findFirst({ where: { accountId: account.id, status: "APPROVED" } });
+      if (membership) await maybeGrantStarter(tx, membership.id);
     });
   });
   if (res?.error) return res;
@@ -85,30 +89,24 @@ export async function verifyEmail(_: ActionState, fd: FormData): Promise<ActionS
 
 export async function resendCode(): Promise<ActionState> {
   const account = await me();
-  await db.account.update({ where: { id: account.id }, data: { verifyCode: newVerifyCode() } });
-  revalidatePath("/verify");
-  return { ok: true, message: "We sent a new code." };
+  return attempt(() => sendVerificationCode(account.id), `We sent a new code to ${account.email}.`);
 }
 
 export async function login(_: ActionState, fd: FormData): Promise<ActionState> {
+  let role = "";
   const res = await attempt(async () => {
     const account = await verifyLogin(str(fd, "email"), String(fd.get("password") ?? ""));
     await createSession(account.id);
+    role = account.role;
   });
   if (res?.error) return res;
-  redirect("/home");
+  // Platform admins usually have no community membership; send them to the console.
+  redirect(["ADMIN", "COIN_ADMIN"].includes(role) ? "/admin" : "/home");
 }
 
 export async function logout() {
   await destroySession();
   redirect("/");
-}
-
-export async function joinCommunity(_: ActionState, fd: FormData): Promise<ActionState> {
-  const account = await me();
-  const res = await attempt(() => requestMembership(account.id, str(fd, "communityId"), str(fd, "inviteCode") || undefined));
-  if (res?.error) return res;
-  redirect("/onboarding/skills");
 }
 
 /** Free-text skills: trimmed, de-duplicated, capped, and kept free of contact details. */
@@ -227,13 +225,7 @@ export async function requestDeletion(_: ActionState): Promise<ActionState> {
     if (open) throw new AppError("Finish or cancel your open exchanges first. Unresolved coin holds must be settled before an account can close.");
     await transaction(async (tx) => {
       // Pseudonymize the public profile; keep ledger and case records (PRD §9).
-      await tx.profile.update({ where: { accountId: account.id }, data: { displayName: "Former member", username: `closed-${account.id}`, bio: "", paused: true } });
-      await tx.privateContact.deleteMany({ where: { accountId: account.id } });
-      await tx.customSkill.deleteMany({ where: { accountId: account.id } });
-      await tx.disclosureGrant.updateMany({ where: { ownerId: account.id, revokedAt: null }, data: { revokedAt: new Date() } });
-      await tx.listing.updateMany({ where: { ownerId: account.id, status: { in: ["OPEN", "PAUSED"] } }, data: { status: "CLOSED" } });
-      await tx.account.update({ where: { id: account.id }, data: { status: "CLOSED", email: `closed+${account.id}@kindbridge.invalid` } });
-      await tx.session.deleteMany({ where: { accountId: account.id } });
+      await admin.closeAccountRecords(tx, account.id);
       await audit(tx, { actorId: account.id, action: "account_closed", targetType: "Account", targetId: account.id });
     });
   }).then((r) => {
@@ -356,21 +348,90 @@ export async function modRemoveListing(_: ActionState, fd: FormData): Promise<Ac
 export async function modSetAccountStatus(_: ActionState, fd: FormData): Promise<ActionState> {
   const account = await me();
   const status = str(fd, "status") === "ACTIVE" ? "ACTIVE" : "SUSPENDED";
-  return attempt(() => safety.setAccountStatus(account.id, str(fd, "accountId"), status, str(fd, "reason")), "Account updated.");
+  const res = await attempt(() => safety.setAccountStatus(account.id, str(fd, "accountId"), status, str(fd, "reason")), "Account updated.");
+  revalidatePath("/admin", "layout");
+  return res;
 }
 
 /** Coin corrections need the separate COIN_ADMIN role (PRD §10). */
 export async function coinReverse(_: ActionState, fd: FormData): Promise<ActionState> {
   const account = await me();
-  return attempt(async () => {
+  const res = await attempt(async () => {
     if (!["COIN_ADMIN", "ADMIN"].includes(account.role)) throw new AppError("Coin corrections need the coin-admin role.");
     const reason = str(fd, "reason");
     if (!reason) throw new AppError("Record a reason for the correction.");
-    await transaction(async (tx) => {
-      const r = await reverse(tx, { transactionId: str(fd, "transactionId"), actorId: account.id, reason });
-      await audit(tx, { actorId: account.id, action: "ledger_reversed", targetType: "LedgerTransaction", targetId: str(fd, "transactionId"), data: { reason, reversal: r.transaction.id } });
-    });
+    await transaction((tx) => correct(tx, { transactionId: str(fd, "transactionId"), actorId: account.id, reason }));
   }, "Reversal posted.");
+  revalidatePath("/admin", "layout");
+  return res;
+}
+
+// ── Admin console ──────────────────────────────────────────────────────
+
+export async function adminSetRole(_: ActionState, fd: FormData): Promise<ActionState> {
+  const account = await me();
+  const res = await attempt(() => admin.setRole(account.id, str(fd, "accountId"), str(fd, "role") as admin.Role, str(fd, "reason")), "Role updated.");
+  revalidatePath("/admin", "layout");
+  return res;
+}
+
+export async function adminBlockMember(_: ActionState, fd: FormData): Promise<ActionState> {
+  const account = await me();
+  const block = str(fd, "block") === "1";
+  const res = await attempt(() => safety.setAccountStatus(account.id, str(fd, "accountId"), block ? "SUSPENDED" : "ACTIVE", str(fd, "reason") || (block ? "Blocked by admin" : "Unblocked by admin")), block ? "Member blocked. They've been signed out." : "Member unblocked.");
+  revalidatePath("/admin", "layout");
+  return res;
+}
+
+export async function adminDeleteMember(_: ActionState, fd: FormData): Promise<ActionState> {
+  const account = await me();
+  let outcome = "";
+  const res = await attempt(async () => {
+    if (str(fd, "confirm").toUpperCase() !== "DELETE") throw new AppError("Type DELETE to confirm.");
+    outcome = await admin.deleteAccount(account.id, str(fd, "accountId"), str(fd, "reason"));
+  });
+  revalidatePath("/admin", "layout");
+  if (res?.error) return res;
+  if (str(fd, "from") === "detail") redirect("/admin/members");
+  return { ok: true, message: outcome === "deleted" ? "Account deleted." : "Account had activity, so it was closed and anonymised; its coin history is kept." };
+}
+
+export async function adminSaveCommunity(_: ActionState, fd: FormData): Promise<ActionState> {
+  const account = await me();
+  const id = str(fd, "id") || null;
+  const res = await attempt(
+    () =>
+      admin.saveCommunity(account.id, id, {
+        name: str(fd, "name"),
+        slug: str(fd, "slug").toLowerCase(),
+        description: str(fd, "description"),
+        inviteCode: str(fd, "inviteCode").toUpperCase(),
+        joinPolicy: str(fd, "joinPolicy") === "INVITE" ? "INVITE" : "APPROVAL",
+        starterGrant: Number(fd.get("starterGrant")),
+        starterAllocation: Number(fd.get("starterAllocation")),
+      }),
+    id ? "Community saved." : "Community created.",
+  );
+  revalidatePath("/admin", "layout");
+  return res;
+}
+
+export async function adminSaveCategory(_: ActionState, fd: FormData): Promise<ActionState> {
+  const account = await me();
+  const id = str(fd, "id") || null;
+  const res = await attempt(
+    () =>
+      admin.saveCategory(account.id, id, {
+        name: str(fd, "name"),
+        slug: str(fd, "slug").toLowerCase(),
+        icon: str(fd, "icon") || "sparkle",
+        maxCoins: Number(fd.get("maxCoins")),
+        active: fd.get("active") === "on",
+      }),
+    id ? "Category saved." : "Category added.",
+  );
+  revalidatePath("/admin", "layout");
+  return res;
 }
 
 export async function decideMember(fd: FormData) {

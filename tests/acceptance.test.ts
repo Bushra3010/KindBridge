@@ -5,6 +5,7 @@ import * as ex from "@/lib/services/exchanges";
 import * as ledger from "@/lib/services/ledger";
 import * as disclosure from "@/lib/services/disclosure";
 import * as safety from "@/lib/services/safety";
+import * as admin from "@/lib/services/admin";
 import { submitReview, reputation } from "@/lib/services/reviews";
 import { searchListings } from "@/lib/services/listings";
 import { balance, community, member, offerListing, requestListing, terms } from "./helpers";
@@ -231,6 +232,90 @@ describe("§7 starter grants & corrections", () => {
     expect((await balance(c.id, a.id)).available).toBe(0);
     expect(await db.ledgerTransaction.count({ where: { OR: [{ id: grant.id }, { reversesId: grant.id }] } })).toBe(2);
     expect((await ledger.reconcile(c.id)).ok).toBe(true);
+  });
+
+  it("audited corrections refuse double reversals and coins held by open exchanges", async () => {
+    const { c, requester, e } = await bookedExchange(10);
+    const coinAdmin = await member(c.id, { role: "COIN_ADMIN", grant: false });
+    const hold = await db.ledgerTransaction.findFirstOrThrow({ where: { exchangeId: e.id, type: "RESERVE" } });
+    await expect(db.$transaction((tx) => ledger.correct(tx, { transactionId: hold.id, actorId: coinAdmin.id, reason: "test" }))).rejects.toThrow(/still open/);
+
+    const grant = await db.ledgerTransaction.findFirstOrThrow({ where: { idempotencyKey: `starter:${c.id}:${requester.id}` } });
+    await ex.cancel(requester.id, e.id, "Plans changed");
+    await db.$transaction((tx) => ledger.correct(tx, { transactionId: grant.id, actorId: coinAdmin.id, reason: "Duplicate account" }));
+    await expect(db.$transaction((tx) => ledger.correct(tx, { transactionId: grant.id, actorId: coinAdmin.id, reason: "again" }))).rejects.toThrow(/already been reversed/);
+    expect(await db.auditEvent.count({ where: { action: "ledger_reversed", targetId: grant.id, actorId: coinAdmin.id } })).toBe(1);
+    expect((await ledger.reconcile(c.id)).ok).toBe(true);
+  });
+});
+
+describe("§10 platform admin", () => {
+  it("only admins change roles, never their own, and every change is audited", async () => {
+    const c = await community();
+    const boss = await member(c.id, { role: "ADMIN", grant: false });
+    const mod = await member(c.id, { role: "MODERATOR", grant: false });
+    const target = await member(c.id);
+    await expect(admin.setRole(mod.id, target.id, "ADMIN", "promote myself a friend")).rejects.toThrow(/access/);
+    await expect(admin.setRole(boss.id, boss.id, "MEMBER", "step down")).rejects.toThrow(/own role/);
+    await expect(admin.setRole(boss.id, target.id, "MODERATOR", "")).rejects.toThrow(/reason/);
+    await admin.setRole(boss.id, target.id, "MODERATOR", "Pilot moderator");
+    expect((await db.account.findUniqueOrThrow({ where: { id: target.id } })).role).toBe("MODERATOR");
+    const ev = await db.auditEvent.findFirstOrThrow({ where: { action: "role_changed", targetId: target.id } });
+    expect(JSON.parse(ev.data)).toMatchObject({ from: "MEMBER", to: "MODERATOR", reason: "Pilot moderator" });
+  });
+
+  it("categories and communities are validated, unique and audited", async () => {
+    const c = await community();
+    const boss = await member(c.id, { role: "ADMIN", grant: false });
+    const slug = `cooking-${Date.now()}`;
+    const cat = await admin.saveCategory(boss.id, null, { name: "Cooking", slug, icon: "heart", maxCoins: 30, active: true });
+    await expect(admin.saveCategory(boss.id, null, { name: "Cooking 2", slug, icon: "heart", maxCoins: 30, active: true })).rejects.toThrow(/already used/);
+    await expect(admin.saveCategory(boss.id, cat.id, { name: "Cooking", slug, icon: "heart", maxCoins: 0, active: true })).rejects.toThrow(/ceiling/);
+    await admin.saveCategory(boss.id, cat.id, { name: "Cooking", slug, icon: "heart", maxCoins: 50, active: false });
+    expect(await db.skillCategory.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ maxCoins: 50, active: false });
+
+    const input = { name: "Riverside", slug: `riverside-${Date.now()}`, description: "", inviteCode: `RIVER${Date.now() % 100000}`, joinPolicy: "INVITE" as const, starterGrant: 15, starterAllocation: 500 };
+    const made = await admin.saveCommunity(boss.id, null, input);
+    await expect(admin.saveCommunity(boss.id, null, { ...input, slug: `other-${Date.now()}` })).rejects.toThrow(/invite code is already used/);
+    const member1 = await member(c.id, { grant: false });
+    await expect(admin.saveCommunity(member1.id, made.id, { ...input, starterGrant: 99 })).rejects.toThrow(/access/);
+    expect(await db.auditEvent.count({ where: { actorId: boss.id, action: { in: ["category_created", "category_updated", "community_created"] } } })).toBe(3);
+  });
+});
+
+describe("§10 admin block and delete", () => {
+  it("deletes a fresh account outright and closes one with history", async () => {
+    const c = await community();
+    const boss = await member(c.id, { role: "ADMIN", grant: false });
+    const fresh = await db.account.create({ data: { email: `fresh-${Date.now()}@test.dev`, passwordHash: "x", profile: { create: { username: `fresh${Date.now()}`, displayName: "Fresh" } } } });
+    expect(await admin.deleteAccount(boss.id, fresh.id, "spam signup")).toBe("deleted");
+    expect(await db.account.findUnique({ where: { id: fresh.id } })).toBeNull();
+
+    const veteran = await member(c.id); // has a starter grant in the ledger
+    expect(await admin.deleteAccount(boss.id, veteran.id, "requested by email")).toBe("closed");
+    const closed = await db.account.findUniqueOrThrow({ where: { id: veteran.id }, include: { profile: true } });
+    expect(closed.status).toBe("CLOSED");
+    expect(closed.email).toMatch(/@kindbridge\.invalid$/);
+    expect(closed.profile?.displayName).toBe("Former member");
+    expect((await ledger.reconcile(c.id)).ok).toBe(true);
+    expect(await db.auditEvent.count({ where: { actorId: boss.id, action: { in: ["account_deleted", "account_closed_by_admin"] } } })).toBe(2);
+  });
+
+  it("refuses unsafe deletes and blocks", async () => {
+    const { c, requester } = await bookedExchange(10);
+    const boss = await member(c.id, { role: "ADMIN", grant: false });
+    const otherAdmin = await member(c.id, { role: "ADMIN", grant: false });
+    const mod = await member(c.id, { role: "MODERATOR", grant: false });
+    await expect(admin.deleteAccount(boss.id, requester.id, "x")).rejects.toThrow(/open exchange/);
+    await expect(admin.deleteAccount(boss.id, otherAdmin.id, "x")).rejects.toThrow(/admin role/);
+    await expect(admin.deleteAccount(boss.id, boss.id, "x")).rejects.toThrow(/your own/);
+    await expect(admin.deleteAccount(mod.id, requester.id, "x")).rejects.toThrow(/access/);
+    await expect(safety.setAccountStatus(mod.id, boss.id, "SUSPENDED", "x")).rejects.toThrow(/access/);
+    await expect(safety.setAccountStatus(boss.id, boss.id, "SUSPENDED", "x")).rejects.toThrow(/own account/);
+
+    const gone = await member(c.id);
+    await admin.deleteAccount(boss.id, gone.id, "test");
+    await expect(safety.setAccountStatus(boss.id, gone.id, "ACTIVE", "undo")).rejects.toThrow(/deleted/);
   });
 });
 

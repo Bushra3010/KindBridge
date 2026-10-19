@@ -6,9 +6,10 @@
 // buckets can never go negative: debits use a conditional update, so a
 // concurrent overspend fails instead of racing.
 
-import { Prisma } from "@prisma/client";
 import { db, type Tx } from "@/lib/db";
-import { AppError, InsufficientBalanceError } from "@/lib/errors";
+import { AppError, InsufficientBalanceError, notFound } from "@/lib/errors";
+import { ACTIVE_EXCHANGE_STATUSES } from "@/lib/constants";
+import { audit } from "./support";
 
 export type Bucket = "AVAILABLE" | "RESERVED";
 export type LedgerType = "STARTER_GRANT" | "RESERVE" | "RELEASE" | "SETTLE" | "REFUND" | "CORRECTION";
@@ -176,6 +177,21 @@ export async function reverse(tx: Tx, p: { transactionId: string; actorId: strin
   });
 }
 
+/**
+ * An audited coin correction: reverses a transaction unless it was already
+ * reversed or its coins still belong to an open exchange (resolve that instead).
+ */
+export async function correct(tx: Tx, p: { transactionId: string; actorId: string; reason: string }) {
+  const original = await tx.ledgerTransaction.findUnique({ where: { id: p.transactionId } });
+  if (!original) throw notFound("Transaction");
+  if (await tx.ledgerTransaction.count({ where: { reversesId: original.id } })) throw new AppError("That transaction has already been reversed.");
+  const ex = original.exchangeId ? await tx.exchange.findUnique({ where: { id: original.exchangeId } }) : null;
+  if (ex && ["PROPOSED", ...ACTIVE_EXCHANGE_STATUSES].includes(ex.status)) throw new AppError(`Exchange ${ex.ref} is still open. Resolve it from moderation before correcting its coins.`);
+  const r = await reverse(tx, { transactionId: original.id, actorId: p.actorId, reason: p.reason });
+  await audit(tx, { actorId: p.actorId, action: "ledger_reversed", targetType: "LedgerTransaction", targetId: original.id, data: { reason: p.reason, reversal: r.transaction.id } });
+  return r;
+}
+
 /** Total coins starter-granted in a community, from ledger entries (not a counter). */
 export async function issuedStarterTotal(tx: Tx, communityId: string) {
   const issuance = await getIssuanceAccount(tx, communityId);
@@ -196,14 +212,25 @@ export type ReconcileReport = {
 
 export async function reconcile(communityId?: string): Promise<ReconcileReport> {
   const problems: string[] = [];
-  const accounts = await db.helpCoinAccount.findMany({ where: communityId ? { communityId } : {} });
-  const sums = await db.ledgerEntry.groupBy({
+  const [accounts, sums, unbalanced, transferredAgg] = await Promise.all([
+    db.helpCoinAccount.findMany({ where: communityId ? { communityId } : {}, select: { id: true, kind: true, available: true, reserved: true } }),
+    db.ledgerEntry.groupBy({
     by: ["coinAccountId", "bucket"],
     _sum: { amount: true },
     where: communityId ? { coinAccount: { communityId } } : {},
-  });
-  const sumOf = (id: string, bucket: Bucket) =>
-    sums.find((s) => s.coinAccountId === id && s.bucket === bucket)?._sum.amount ?? 0;
+    }),
+    db.ledgerEntry.groupBy({
+      by: ["transactionId"],
+      where: communityId ? { coinAccount: { communityId } } : {},
+      having: { amount: { _sum: { not: 0 } } },
+    }),
+    db.ledgerEntry.aggregate({
+      where: { amount: { gt: 0 }, transaction: { type: "SETTLE" }, ...(communityId ? { coinAccount: { communityId } } : {}) },
+      _sum: { amount: true },
+    }),
+  ]);
+  const balances = new Map(sums.map(s => [`${s.coinAccountId}:${s.bucket}`, s._sum.amount ?? 0]));
+  const sumOf = (id: string, bucket: Bucket) => balances.get(`${id}:${bucket}`) ?? 0;
 
   let issued = 0, available = 0, reserved = 0;
   for (const a of accounts) {
@@ -218,15 +245,7 @@ export async function reconcile(communityId?: string): Promise<ReconcileReport> 
   }
   if (issued !== available + reserved) problems.push(`Issued ${issued} ≠ member holdings ${available + reserved}`);
 
-  const unbalanced = await db.$queryRaw<{ transactionId: string }[]>(
-    Prisma.sql`SELECT transactionId FROM LedgerEntry GROUP BY transactionId HAVING SUM(amount) <> 0`,
-  );
   for (const u of unbalanced) problems.push(`Transaction ${u.transactionId} is unbalanced`);
-
-  const transferredAgg = await db.ledgerEntry.aggregate({
-    where: { amount: { gt: 0 }, transaction: { type: "SETTLE" }, ...(communityId ? { coinAccount: { communityId } } : {}) },
-    _sum: { amount: true },
-  });
 
   return {
     ok: problems.length === 0,

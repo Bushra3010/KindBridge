@@ -1,7 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -45,12 +46,9 @@ export async function verifyLogin(email: string, password: string) {
   return account;
 }
 
-export function newVerifyCode() {
-  return String(randomInt(100000, 999999));
-}
-
 /** The signed-in account, or null. */
-export async function currentAccount() {
+// Share the session lookup within one render only; never cache across requests/users.
+export const currentAccount = cache(async () => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const session = await db.session.findUnique({
@@ -59,7 +57,7 @@ export async function currentAccount() {
   });
   if (!session || session.expiresAt < new Date() || session.account.status !== "ACTIVE") return null;
   return session.account;
-}
+});
 
 export type Viewer = NonNullable<Awaited<ReturnType<typeof currentAccount>>>;
 
@@ -76,10 +74,11 @@ export async function requireMember(opts: { allowPending?: boolean } = {}) {
   const membership = await db.membership.findFirst({
     where: { accountId: account.id, status: { in: ["PENDING", "APPROVED"] } },
     include: { community: true },
+    orderBy: { status: "asc" }, // APPROVED first
   });
   if (!membership) redirect("/onboarding/community");
   if (!account.profile.onboardedAt) redirect("/onboarding/skills");
-  if (membership.status === "PENDING" && !opts.allowPending) redirect("/pending");
+  if (membership.status === "PENDING" && !opts.allowPending) redirect("/onboarding/community"); // approves it
   return { account, profile: account.profile, membership, community: membership.community };
 }
 

@@ -6,3 +6,5 @@ prisma/*.db
 prisma/*.db-journal
 .env
 .DS_Store
+.vercel
+.env*

@@ -4,18 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/demo-seed.ts",
+    "db:reset": "prisma db push --force-reset && tsx --env-file=.env prisma/seed.ts",
     "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "6.16.2",
     "bcryptjs": "3.0.2",
-    "next": "15.5.4",
+    "next": "15.5.28",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "server-only": "^0.0.1",

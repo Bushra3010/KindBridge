@@ -12,7 +12,7 @@ export const metadata = { title: "Create your account" };
 
 export default async function Signup() {
   const a = await currentAccount();
-  if (a) redirect(a.emailVerifiedAt ? "/home" : "/verify");
+  if (a) redirect(["ADMIN", "COIN_ADMIN"].includes(a.role) ? "/admin" : a.emailVerifiedAt ? "/home" : "/verify");
   return (
     <Screen nav={false}>
       <PageHeader title="" back="/" />

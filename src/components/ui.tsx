@@ -79,3 +79,6 @@ export const CATEGORY_ICON: Record<string, IconName> = {
   plants: "leaf",
   music: "music",
 };
+
+/** Built-in categories keep their drawn icon; admin-added ones use the icon stored on the category. */
+export const categoryIcon = (c: { slug: string; icon?: string | null }): IconName => CATEGORY_ICON[c.slug] ?? c.icon ?? "sparkle";

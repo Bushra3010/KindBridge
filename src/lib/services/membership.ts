@@ -1,4 +1,4 @@
-import { transaction, type Tx } from "@/lib/db";
+import { db, transaction, type Tx } from "@/lib/db";
 import { AppError, forbidden, notFound } from "@/lib/errors";
 import { issuedStarterTotal, starterGrant } from "./ledger";
 import { audit, notify } from "./support";
@@ -38,6 +38,35 @@ export async function requestMembership(accountId: string, communityId: string, 
   });
 }
 
+/**
+ * Members don't choose or apply to a community: they're placed in the pilot
+ * community (DEFAULT_COMMUNITY_SLUG, else the oldest one), approved at once and
+ * given their starter coins. Returns null if no community exists yet.
+ */
+export async function joinDefaultCommunity(accountId: string) {
+  const slug = process.env.DEFAULT_COMMUNITY_SLUG;
+  const community = slug
+    ? await db.community.findUnique({ where: { slug } })
+    : await db.community.findFirst({ orderBy: { createdAt: "asc" } });
+  if (!community) return null;
+  return transaction(async (tx) => {
+    const key = { accountId_communityId: { accountId, communityId: community.id } };
+    const existing = await tx.membership.findUnique({ where: key });
+    // Someone a moderator removed or declined is never re-enrolled automatically.
+    if (existing && existing.status !== "PENDING" && existing.status !== "APPROVED") return null;
+    const membership =
+      existing?.status === "APPROVED"
+        ? existing
+        : await tx.membership.upsert({
+            where: key,
+            create: { accountId, communityId: community.id, status: "APPROVED", approvedAt: new Date() },
+            update: { status: "APPROVED", approvedAt: new Date() },
+          });
+    await maybeGrantStarter(tx, membership.id);
+    return membership;
+  });
+}
+
 export async function decideMembership(organizerId: string, membershipId: string, approve: boolean) {
   return transaction(async (tx) => {
     const m = await tx.membership.findUnique({ where: { id: membershipId } });
@@ -68,11 +97,11 @@ export async function decideMembership(organizerId: string, membershipId: string
 
 /**
  * One-time starter grant from the community's capped onboarding allocation.
- * Requires an approved membership and a verified contact channel.
+ * Requires an approved membership, an active account, and a verified email.
  */
 export async function maybeGrantStarter(tx: Tx, membershipId: string) {
   const m = await tx.membership.findUniqueOrThrow({ where: { id: membershipId }, include: { community: true, account: true } });
-  if (m.status !== "APPROVED" || m.starterGranted || !m.account.emailVerifiedAt) return false;
+  if (m.status !== "APPROVED" || m.starterGranted || m.account.status !== "ACTIVE" || !m.account.emailVerifiedAt) return false;
 
   const issued = await issuedStarterTotal(tx, m.communityId);
   if (issued + m.community.starterGrant > m.community.starterAllocation) return false;

@@ -36,7 +36,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
         <h1 className="mt-3 text-[26px] font-extrabold">{profile.displayName}</h1>
         {profile.bio && <p className="text-ink-soft">{profile.bio}</p>}
         <div className="mt-2 flex justify-center gap-1.5">
-          <span className="pill bg-teal-50 text-teal-800"><Icon name="checkCircle" size={14} /> Contact verified</span>
+          {profile.account.emailVerifiedAt && <span className="pill bg-teal-50 text-teal-800"><Icon name="checkCircle" size={14} /> Contact verified</span>}
           <span className="pill bg-sky-50 text-sky-900"><Icon name="users" size={14} /> Community member</span>
         </div>
         <p className="mt-2 text-[13px] text-muted">{profile.paused ? "Currently unavailable" : `Usually available: ${profile.availability}`}</p>

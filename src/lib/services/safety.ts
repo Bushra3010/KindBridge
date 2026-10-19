@@ -72,6 +72,13 @@ export async function removeListing(modId: string, listingId: string, reason: st
 export async function setAccountStatus(modId: string, accountId: string, status: "ACTIVE" | "SUSPENDED", reason: string) {
   return transaction(async (tx) => {
     await requireModerator(tx, modId);
+    if (modId === accountId) throw new AppError("You can't block your own account.");
+    const target = await tx.account.findUnique({ where: { id: accountId } });
+    if (!target) throw notFound("Account");
+    if (target.status === "CLOSED") throw new AppError("That account was deleted and can't be changed.");
+    const actor = await tx.account.findUniqueOrThrow({ where: { id: modId } });
+    if (target.role === "ADMIN" && actor.role !== "ADMIN") throw forbidden();
+    if (target.status === status) return;
     await tx.account.update({ where: { id: accountId }, data: { status } });
     if (status === "SUSPENDED") await tx.session.deleteMany({ where: { accountId } });
     await audit(tx, { actorId: modId, action: `account_${status.toLowerCase()}`, targetType: "Account", targetId: accountId, data: { reason } });

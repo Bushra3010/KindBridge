@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+App Design
+scripts
+tests
+.next
+node_modules

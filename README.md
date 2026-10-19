@@ -8,34 +8,31 @@ This repository is the **P0 community pilot**: a mobile-first web app.
 
 ```bash
 npm install
-cp .env.example .env
-npx prisma db push        # create the local SQLite database
-npm run db:seed           # demo community, members and history
+cp .env.example .env       # fill in your Supabase Postgres connection strings
+npx prisma db push        # create the tables in the "app" schema
+npm run db:seed           # creates the admin from ADMIN_EMAIL / ADMIN_PASSWORD
 npm run dev               # http://localhost:3000
 ```
 
-Demo accounts (password `kindbridge123`):
+Then sign in as the admin and open `/admin`: create the community members join (Communities) and the skill categories they choose from (Categories). Until a community exists, signups see "KindBridge isn't open yet".
 
-| Email | Role |
-| --- | --- |
-| `nova18@kindbridge.dev` | Member + organizer of Lakeview Residents |
-| `echo27@`, `pixel42@`, `muse14@`, `orbit09@kindbridge.dev` | Members |
-| `safeharbor@kindbridge.dev` | Moderator (`/mod`) |
+For throwaway demo data instead (members, listings and history; password `kindbridge123`), run `npm run db:seed:demo` on an empty database. Never use it on a database with real members.
 
-Lakeview's invite code is `KIND2026`. Without it, new members wait for organizer approval. Email delivery isn't wired up yet; in development the verification code is shown on the verify screen.
+Members verify their email with a six-digit OTP, then join the oldest community (or `DEFAULT_COMMUNITY_SLUG`), receive approval and starter coins, and choose their skills. Codes expire after 15 minutes; resends have a 60-second cooldown and codes lock after five failed attempts. Verify `kindbridge.co.in` in Resend, configure a Sending-only `RESEND_API_KEY` in Vercel production, and set `EMAIL_FROM` to `KindBridge <noreply@kindbridge.co.in>` before deploying. Development without an API key logs codes locally; production requires real email delivery.
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
 | `npm run dev` / `build` / `start` | Next.js dev server / production build / serve |
-| `npm test` | Vitest acceptance suite (PRD §17) against a throwaway `prisma/test.db` |
+| `npm test` | Vitest acceptance suite (PRD §17) against the throwaway `app_test` schema |
 | `npm run lint` | TypeScript type check |
-| `npm run db:seed` | Seed an empty database |
+| `npm run db:seed` | Create the platform admin from `.env` |
+| `npm run db:seed:demo` | Load demo members and history into an empty database |
 
 ## Stack
 
-Next.js 15 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS v4 · Prisma 6 · SQLite in development (the schema avoids SQLite-only features so it ports to Postgres) · Zod · Vitest.
+Next.js 15 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS v4 · Prisma 6 · Postgres on Supabase · Zod · Vitest.
 
 ## Layout
 
@@ -49,9 +46,11 @@ src/lib/services/
   disclosure.ts             Field- and recipient-specific sharing grants
   listings.ts               Listings, community-scoped search and ranking, suggestions
   reviews.ts, safety.ts     Reviews/reputation; blocks, reports, moderation
+  admin.ts                  Role changes, communities, categories (ADMIN-only, audited)
 src/app/actions.ts          Server actions (all mutations)
 src/app/(app)/…             Member screens (home, explore, requests, coins, profile…)
 src/app/mod, /organizer     Moderator and organizer consoles
+src/app/admin               Platform admin console
 tests/acceptance.test.ts    PRD §17 checks
 ```
 
@@ -63,11 +62,10 @@ tests/acceptance.test.ts    PRD §17 checks
 
 ## P0 status against the PRD
 
-Implemented: onboarding (account, email code, 18+/rules, username and avatar, community join or approval, skills); listings, search and filters; proposals with versioned terms; atomic reservation; chat with polling; reschedule; deliver/confirm/settle; cancel-and-refund; partial settlement; disputes; moderator resolution with audit; no-response reminders and 7-day flag (no auto-settle); reviews with delayed publishing and private thank-you notes; selective disclosure with preview and revoke; blocking; reports and support cases; notifications; organizer approvals with small-count suppression; coin wallet and transaction details; account closure with pseudonymization.
+Implemented: onboarding (account, email code, 18+/rules, username and avatar, community join or approval, skills); listings, search and filters; proposals with versioned terms; atomic reservation; chat with polling; reschedule; deliver/confirm/settle; cancel-and-refund; partial settlement; disputes; moderator resolution with audit; no-response reminders and 7-day flag (no auto-settle); reviews with delayed publishing and private thank-you notes; selective disclosure with preview and revoke; blocking; reports and support cases; notifications; organizer approvals with small-count suppression; coin wallet and transaction details; account closure with pseudonymization; admin console (`/admin`: overview, member search with role changes and suspend/restore, communities, skill categories and coin ceilings, per-community reconciliation with audited coin reversals, audit log).
 
 Not done yet:
 - Real email delivery and a scheduler. Sweeps run lazily on page loads for now.
 - Rate limiting, at-rest encryption of `PrivateContact`, backup/restore drill, retention policy (PRD §14, §9).
 - Browser E2E tests (Playwright), and a keyboard/screen-reader pass of core flows (§17.13).
-- Coin-admin correction UI. The `coinReverse` action exists; the screen does not.
 - P1: boosts, billing, subscriptions (design board 06 "Paid visibility" / "Boost checkout").
