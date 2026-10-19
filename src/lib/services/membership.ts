@@ -38,17 +38,34 @@ export async function requestMembership(accountId: string, communityId: string, 
   });
 }
 
+const DEFAULT_SLUG = () => process.env.DEFAULT_COMMUNITY_SLUG || "kindbridge";
+
+/**
+ * The community every member belongs to. Members never pick one, so if none
+ * exists yet (fresh database) it is created here with the standard coin
+ * settings; admins can rename or adjust it in /admin → Communities.
+ */
+async function defaultCommunity() {
+  const bySlug = await db.community.findUnique({ where: { slug: DEFAULT_SLUG() } });
+  if (bySlug) return bySlug;
+  const oldest = await db.community.findFirst({ orderBy: { createdAt: "asc" } });
+  if (oldest) return oldest;
+  const inviteCode = `KB${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  // upsert so two first signups racing each other end up in the same community.
+  return db.community.upsert({
+    where: { slug: DEFAULT_SLUG() },
+    create: { name: "KindBridge", slug: DEFAULT_SLUG(), description: "Share skills, earn help coins and find support.", inviteCode, joinPolicy: "APPROVAL" },
+    update: {},
+  });
+}
+
 /**
  * Members don't choose or apply to a community: they're placed in the pilot
  * community (DEFAULT_COMMUNITY_SLUG, else the oldest one), approved at once and
- * given their starter coins. Returns null if no community exists yet.
+ * given their starter coins. Returns null only for removed/declined members.
  */
 export async function joinDefaultCommunity(accountId: string) {
-  const slug = process.env.DEFAULT_COMMUNITY_SLUG;
-  const community = slug
-    ? await db.community.findUnique({ where: { slug } })
-    : await db.community.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!community) return null;
+  const community = await defaultCommunity();
   return transaction(async (tx) => {
     const key = { accountId_communityId: { accountId, communityId: community.id } };
     const existing = await tx.membership.findUnique({ where: key });

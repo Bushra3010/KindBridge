@@ -14,7 +14,7 @@ npm run db:seed           # creates the admin from ADMIN_EMAIL / ADMIN_PASSWORD
 npm run dev               # http://localhost:3000
 ```
 
-Then sign in as the admin and open `/admin`: create the community members join (Communities) and the skill categories they choose from (Categories). Until a community exists, signups see "KindBridge isn't open yet".
+Then sign in as the admin and open `/admin`: add the skill categories members choose from (Categories). The community everyone joins is created automatically on the first signup; rename it under Communities.
 
 For throwaway demo data instead (members, listings and history; password `kindbridge123`), run `npm run db:seed:demo` on an empty database. Never use it on a database with real members.
 
