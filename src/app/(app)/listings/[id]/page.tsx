@@ -104,8 +104,8 @@ export default async function ListingPage({ params, searchParams }: { params: Pr
         <Icon name="right" className="text-muted" />
       </Link>
       <div className="card mt-3 p-5">
-        <span className="pill bg-teal-50 text-teal-800">{listing.category.name}</span>
-        <h2 className="mt-2 text-[22px] font-extrabold">{listing.title}</h2>
+        {listing.category.active && <span className="pill mb-2 bg-teal-50 text-teal-800">{listing.category.name}</span>}
+        <h2 className="text-[22px] font-extrabold">{listing.title}</h2>
         <p className="mt-2 whitespace-pre-line text-[15px] text-ink-soft">{listing.description}</p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[13px]">
           <div className="rounded-2xl bg-mist p-2"><Coin size={20} className="mx-auto" /><div className="mt-1 font-bold">{listing.coins} coins</div></div>
@@ -127,7 +127,7 @@ export default async function ListingPage({ params, searchParams }: { params: Pr
           <ActionForm action={sendProposal} className="card space-y-4 p-4">
             <input type="hidden" name="listingId" value={id} />
             <TermsFields d={{ deliverable: listing.title, durationMin: listing.durationMin, coins: listing.coins, format: listing.format }} maxCoins={listing.category.maxCoins} />
-            <Submit>Send proposal</Submit>
+            <Submit>{isOffer ? "Send proposal" : "Accept helping"}</Submit>
             <Note>{isOffer ? "Coins are reserved when the helper accepts, and released only after you confirm the help." : "You'll earn coins after the requester confirms your help."}</Note>
           </ActionForm>
         </section>

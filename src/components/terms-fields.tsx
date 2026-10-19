@@ -33,7 +33,7 @@ export function TermsFields({ d = {}, maxCoins, showNote = true }: { d?: Default
           </div>
         </div>
       </div>
-      <p className="-mt-2 text-[12px] text-muted">Guide: about 10 coins per 30 minutes of everyday help. Max {maxCoins} in this category.</p>
+      <p className="-mt-2 text-[12px] text-muted">Guide: about 10 coins per 30 minutes of everyday help. Max {maxCoins} per session.</p>
       <div>
         <label className="label" htmlFor="materials">Materials needed <span className="font-normal text-muted">(optional)</span></label>
         <input id="materials" name="materials" className="field" defaultValue={d.materials} placeholder="Slides link, laptop…" maxLength={300} />

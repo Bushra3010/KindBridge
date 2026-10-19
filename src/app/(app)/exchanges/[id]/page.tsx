@@ -384,7 +384,7 @@ export default async function ExchangePage({ params, searchParams }: { params: P
           </ActionForm>
         )}
       </section>
-      <p className="mt-6 text-center text-[12px] text-muted">{FORMATS[ex.listing.format as Format]} · {ex.listing.category.name} · Listing: <Link className="underline" href={`/listings/${ex.listingId}`}>{ex.listing.title}</Link></p>
+      <p className="mt-6 text-center text-[12px] text-muted">{FORMATS[ex.listing.format as Format]}{ex.listing.category.active && <> · {ex.listing.category.name}</>} · Listing: <Link className="underline" href={`/listings/${ex.listingId}`}>{ex.listing.title}</Link></p>
     </Screen>
   );
 }

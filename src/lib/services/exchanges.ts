@@ -74,7 +74,7 @@ export async function propose(actorId: string, listingId: string, input: unknown
     await assertCanTransact(tx, actorId, listing.communityId);
     if (await isBlockedEitherWay(tx, actorId, listing.ownerId)) throw new AppError("You can't send proposals to this member.");
     if (terms.coins > listing.category.maxCoins)
-      throw new AppError(`${listing.category.name} quotes are capped at ${listing.category.maxCoins} coins during the pilot.`);
+      throw new AppError(`Sessions are capped at ${listing.category.maxCoins} coins during the pilot.`);
 
     const open = await tx.exchange.findFirst({ where: { listingId, status: "PROPOSED", OR: [{ requesterId: actorId }, { helperId: actorId }] } });
     if (open) throw new AppError("You already have an open proposal on this listing.");
