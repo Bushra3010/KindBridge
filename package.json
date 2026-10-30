@@ -12,7 +12,8 @@
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:seed:demo": "tsx prisma/demo-seed.ts",
     "db:reset": "prisma db push --force-reset && tsx --env-file=.env prisma/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seo:ping": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.16.2",

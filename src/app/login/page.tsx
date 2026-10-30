@@ -3,8 +3,9 @@ import { login } from "@/app/actions";
 import { ActionForm, Submit } from "@/components/forms";
 import { Logo } from "@/components/brand";
 import { PageHeader, Screen } from "@/components/ui";
+import { publicMetadata } from "@/lib/site";
 
-export const metadata = { title: "Sign in" };
+export const metadata = publicMetadata({ title: "Sign in", description: "Sign in to KindBridge to find help, offer your skills and manage your help coins.", path: "/login" });
 
 export default function Login() {
   return (

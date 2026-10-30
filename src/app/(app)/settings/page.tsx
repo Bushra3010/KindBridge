@@ -36,6 +36,9 @@ export default async function Settings() {
         <Row href="/settings/cases" icon="file" label="My support cases" />
         <Row href="/privacy/blocked" icon="ban" label="Blocked accounts" />
         <Row href="/rules" icon="info" label="Community rules & safety" />
+        <Row href="/support" icon="info" label="Contact support" />
+        <Row href="/privacy-policy" icon="shield" label="Privacy policy" />
+        <Row href="/terms" icon="file" label="Terms of use" />
       </div>
       <div className="mt-3"><Note>Support triages reports within one business day during support hours. KindBridge isn't an emergency service.</Note></div>
 

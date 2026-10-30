@@ -5,16 +5,21 @@ import { Coin, Logo } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { WelcomeArt } from "@/components/welcome-art";
 import { Screen } from "@/components/ui";
+import { JsonLd, homeGraph } from "@/components/json-ld";
+import { SITE_DESCRIPTION, publicMetadata } from "@/lib/site";
+
+export const metadata = publicMetadata({ description: SITE_DESCRIPTION, path: "/" });
 
 export default async function Welcome() {
   if (await currentAccount()) redirect("/home");
   return (
     <Screen nav={false}>
+      <JsonLd data={homeGraph()} />
       <div className="welcome-content flex min-h-[calc(100dvh-74px)] flex-col items-center text-center">
         <WelcomeArt />
         <div className="welcome-logo mt-4"><Logo size={34} /></div>
         <h1 className="welcome-title mt-5 text-[32px] font-extrabold leading-tight tracking-tight">A little help goes<br />a long way.</h1>
-        <p className="mt-2 text-[16px] text-ink-soft">Share skills. Earn coins. Find support.</p>
+        <p className="mt-2 text-[16px] text-ink-soft">Share skills. Earn help coins. Find support in your community.</p>
 
         <ol className="welcome-steps mt-7 flex w-full items-start justify-center gap-2" aria-label="How it works">
           {[
@@ -35,7 +40,7 @@ export default async function Welcome() {
         <div className="welcome-actions mt-auto w-full space-y-2.5 pt-8">
           <Link href="/signup" className="btn-primary w-full">Get started <Icon name="right" size={18} /></Link>
           <Link href="/login" className="btn-secondary w-full">I already have an account</Link>
-          <p className="pt-1 text-[12px] text-muted">An 18+ community · <Link href="/rules" className="underline">Community rules</Link></p>
+          <p className="pt-1 text-[12px] text-muted">An 18+ community · <Link href="/how-it-works" className="underline">How it works</Link> · <Link href="/rules" className="underline">Community rules</Link></p>
         </div>
       </div>
     </Screen>

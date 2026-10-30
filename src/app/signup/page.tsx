@@ -7,8 +7,13 @@ import { AVATAR_KEYS } from "@/components/avatar";
 import { Icon } from "@/components/icons";
 import { PageHeader, Screen } from "@/components/ui";
 import { AvatarPicker } from "./avatar-picker";
+import { publicMetadata } from "@/lib/site";
 
-export const metadata = { title: "Create your account" };
+export const metadata = publicMetadata({
+  title: "Create your account",
+  description: "Join KindBridge free: create an account, verify your email, pick a private username and start sharing skills and help coins with your community. Adults 18+.",
+  path: "/signup",
+});
 
 export default async function Signup() {
   const a = await currentAccount();

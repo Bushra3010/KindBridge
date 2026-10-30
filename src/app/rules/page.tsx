@@ -1,6 +1,13 @@
+import { PublicFooter } from "@/components/public-footer";
 import { PageHeader } from "@/components/ui";
+import { JsonLd, breadcrumbLd } from "@/components/json-ld";
+import { publicMetadata } from "@/lib/site";
 
-export const metadata = { title: "Community rules" };
+export const metadata = publicMetadata({
+  title: "Community rules",
+  description: "KindBridge community rules: adults only, everyday help only, never ask for passwords, respect privacy, help coins are not cash, and how to meet safely in a shared space.",
+  path: "/rules",
+});
 
 const RULES: [string, string][] = [
   ["Adults only", "KindBridge is for members aged 18 and over."],
@@ -15,6 +22,7 @@ const RULES: [string, string][] = [
 export default function Rules() {
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-4">
+      <JsonLd data={{ "@context": "https://schema.org", ...breadcrumbLd([{ name: "Home", path: "/" }, { name: "Community rules", path: "/rules" }]) }} />
       <PageHeader title="Community rules" back="/" />
       <ol className="space-y-3">
         {RULES.map(([t, b], i) => (
@@ -26,6 +34,7 @@ export default function Rules() {
       </ol>
       <h2 className="h-section mb-2 mt-6">Meeting in a shared space</h2>
       <p className="text-[14px] text-ink-soft">Choose a public or common area such as a society clubhouse, campus library or coworking lounge. Tell someone where you'll be. You never need to share your home address.</p>
+      <PublicFooter />
     </main>
   );
 }
